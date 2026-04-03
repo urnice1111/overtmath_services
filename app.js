@@ -37,6 +37,29 @@ app.get('/get_questions/:island/:difficulty', (req, res) => {
     });
 });
 
+/*
+  Get top N (5) players
+*/
+app.get('/get_scoreboard', (req, res) => {
+  const sql = `
+        SELECT *
+        FROM jugador
+        ORDER BY score_global DESC
+        LIMIT 10;
+        `;
+
+  connection.query(sql, (err, rows) => {
+        if (err) {
+            console.error(err);
+            res.status(500).json({ error: err.message });
+            return;
+        }
+
+        res.json({ top_players: rows });
+    });
+});
+
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
