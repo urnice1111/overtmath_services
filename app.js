@@ -112,7 +112,7 @@ app.put('/set_login_user', (req, res) => {
   }
 
   const sql = `
-    INSERT INTO registro (fecha_hora_inicio, cuenta)
+    INSERT INTO registro (fecha_hora_incicio, cuenta)
     VALUES (CURRENT_TIMESTAMP, ?)
   `;
 
@@ -126,8 +126,78 @@ app.put('/set_login_user', (req, res) => {
       registroId: result.insertId,
       userId: userId
     });
+  });
 });
+
+
+app.post('/login', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({
+      error: 'email or password missing'
+    });
+  }
+
+  const sql = 'SELECT id_cuenta, correo, contrasena_hash FROM cuenta WHERE correo = ?';
+
+  connection.execute(sql, [email], async (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        error: err.message
+      });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({
+        error: 'user not found'
+      });
+    }
+
+    const user = results[0];
+
+    try {
+      const match = await bcrypt.compare(password, user.contrasena_hash);
+
+      if (!match) {
+        return res.status(401).json({
+          error: 'invalid credentials'
+        });
+      }
+
+      return res.status(200).json({
+        message: 'login successful',
+        user: {
+          id: user.id_cuenta,
+          email: user.correo
+        }
+      });
+
+    } catch (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+  });
+});
+
+app.put('/end_session', (req, res) => {
+  const { id_sesion } = req.body;
+  const sql = `UPDATE sesiones 
+             SET hora_fin = NOW() 
+             WHERE id_sesion = ? AND hora_fin IS NULL`;
+  connection.query(sql, [id_sesion], (err, result) => {
+    if (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: "Session ended successfully" });
+    }
+  });
+});
+
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
+
