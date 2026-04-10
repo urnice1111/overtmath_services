@@ -142,6 +142,7 @@ app.get('/get_questions/:island/:difficulty', (req, res) => {
 /*
   Get top N (5) players
 */
+
 app.get('/get_scoreboard', (req, res) => {
   const sql = `
         SELECT *
@@ -162,6 +163,23 @@ app.get('/get_scoreboard', (req, res) => {
 });
 
 
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)
 })
+
+app.put('/end_session', (req, res) => {
+  const { id_sesion } = req.body;
+  const sql = `UPDATE sesiones 
+             SET hora_fin = NOW() 
+             WHERE id_sesion = ? AND hora_fin IS NULL`;
+  connection.query(sql, [id_sesion], (err, result) => {
+    if (err) {
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ message: "Session ended successfully" });
+    }
+  });
+});
+
