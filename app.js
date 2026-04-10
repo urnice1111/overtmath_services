@@ -19,6 +19,56 @@ connection.connect()
 
 app.use(express.json())
 
+app.post('/login', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({
+      error: 'email or password missing'
+    });
+  }
+
+  const sql = 'SELECT id_cuenta, correo, contrasena_hash FROM cuenta WHERE correo = ?';
+
+  connection.execute(sql, [email], async (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        error: err.message
+      });
+    }
+
+    if (results.length === 0) {
+      return res.status(404).json({
+        error: 'user not found'
+      });
+    }
+
+    const user = results[0];
+
+    try {
+      const match = await bcrypt.compare(password, user.contrasena_hash);
+
+      if (!match) {
+        return res.status(401).json({
+          error: 'invalid credentials'
+        });
+      }
+
+      return res.status(200).json({
+        message: 'login successful',
+        user: {
+          id: user.id,
+          email: user.correo
+        }
+      });
+
+    } catch (error) {
+      return res.status(500).json({
+        error: error.message
+      });
+    }
+  });
+});
 
 app.post('/register', async (req, res) => {
     try{
@@ -48,7 +98,7 @@ app.post('/register', async (req, res) => {
           });
         }
 
-        res.status(201).json({
+        return res.status(201).json({
           message: "user created succesfully"
         });
       });
@@ -59,6 +109,12 @@ app.post('/register', async (req, res) => {
       });
     }
 });
+
+
+app.get('/check_user', (req, res) => {
+
+});
+
 
 app.get('/get_questions/:island/:difficulty', (req, res) => {
     const { island, difficulty } = req.params;
