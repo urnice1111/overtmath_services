@@ -1,18 +1,18 @@
-const express = require('express')
-const bcrypt = require('bcrypt');
-const mysql = require('mysql2')
+import express from 'express'
+import bcrypt from 'bcrypt'
+import mysql from 'mysql2'
 
 const app = express()
 const port = 3000
 
-const { connect } = require('node:http2')
+// const { connect } = require('node:http2')
 
 const connection = mysql.createConnection({
   host: '127.0.0.1',
   port: 3307,
   user: 'root',
   password: '',
-  database: 'redes'
+  database: 'over_math'
 })
 
 connection.connect()
@@ -182,22 +182,28 @@ app.post('/login', (req, res) => {
 });
 
 app.put('/end_session', (req, res) => {
-  const { id_sesion } = req.body;
-  const sql = `UPDATE sesiones 
-             SET hora_fin = NOW() 
-             WHERE id_sesion = ? AND hora_fin IS NULL`;
-  connection.query(sql, [id_sesion], (err, result) => {
+  const { id_session } = req.body;
+  const sql = `UPDATE registro 
+             SET fecha_hora_fin = NOW() 
+             WHERE id_registro = ? AND fecha_hora_fin IS NULL`;
+  connection.query(sql, [id_session], (err, result) => {
     if (err) {
       console.error(err);
       res.status(500).json({ error: err.message });
     } else {
-      res.json({ message: "Session ended successfully" });
+      res.status(201).json({ message: "Session ended successfully" });
     }
   });
 });
 
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
+  app.listen(port, () => {
+    console.log(
+      `Server listening`);
+  });
+}
 
+
+
+export default app;
