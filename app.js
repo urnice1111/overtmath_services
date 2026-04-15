@@ -89,45 +89,6 @@ app.get('/get_scoreboard', async (req, res) => {
 });
 
 
-app.put('/set_login_user', async (req, res) => {
-  const { deviceType, userId } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId missing' });
-  }
-
-  let connection;
-  let host = `https://${req.hostname}`;
-
-  try{
-    connection = await db.connect();
-    const result = await db.setLoginUser(connection, host, userId, deviceType);
-
-    return res.status(201).json({
-      result
-    });
-
-  }catch(err){
-      const {name, message} = err;
-      res.status(500).json({name, message});
-  } finally {
-    if (connection){
-      await connection.end();
-    }
-  }
-});
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.post('/login', async (req, res) => {
   const { email, password, deviceType } = req.body;
