@@ -19,6 +19,7 @@ async function register(connection, host, email, password) {
 
     try {
         const [result] = await connection.execute(sqlQuery, [email, hashedPassword]);
+        console.log(result);
         return result;
     } catch (error) {
         console.error("Database Error:", error.message);
@@ -80,14 +81,49 @@ async function setLoginUser(connection, host, userId, deviceType){
         console.error("Database Error:", error.message);
         throw error;
     }
+}
 
 
+async function login(connection, host, email, password, deviceType) {
+    const sqlQuery = `
+        SELECT id_cuenta, correo, contrasena_hash
+        FROM cuenta
+        WHERE correo = ?
+    `;
+
+    try {
+        const [rows] = await connection.execute(sqlQuery, [email]);
+
+        if (rows.length === 0) {
+            return { ok: false, message: 'User not found' };
+        }
+
+        const user = rows[0];
+        const match = await bcrypt.compare(password, user.contrasena_hash);
+
+        if (!match) {
+            return { ok: false, message: 'Invalid password' };
+        }
+
+        await setLoginUser(connection, host, user.id_cuenta, deviceType);
+
+        return {
+            ok: true,
+            user: {
+                id_cuenta: user.id_cuenta,
+                correo: user.correo
+            }
+        };
+
+    } catch (error) {
+        console.error("Database error:", error);
+        throw error;
+    }
 }
 
 
 
 
-
 export default{
-    connect, register, getQuestions, getScoreboard, setLoginUser
+    connect, register, getQuestions, getScoreboard, setLoginUser, login
 };

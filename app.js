@@ -104,7 +104,7 @@ app.put('/set_login_user', async (req, res) => {
     const result = await db.setLoginUser(connection, host, userId, deviceType);
 
     return res.status(201).json({
-      message: 'login set successfully',
+      result
     });
 
   }catch(err){
@@ -129,56 +129,34 @@ app.put('/set_login_user', async (req, res) => {
 
 
 
-app.post('/login', (req, res) => {
-  const { email, password } = req.body;
+app.post('/login', async (req, res) => {
+  const { email, password, deviceType } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({
       error: 'email or password missing'
     });
   }
-//a
-  const sql = 'SELECT id_cuenta, correo, contrasena_hash FROM cuenta WHERE correo = ?';
 
-  connection.execute(sql, [email], async (err, results) => {
-    if (err) {
-      return res.status(500).json({
-        error: err.message
-      });
-    }
 
-    if (results.length === 0) {
-      return res.status(404).json({
-        error: 'user not found'
-      });
-    }
+  let connection;
+  let host = `https://${req.hostname}`;
 
-    const user = results[0];
+  try {
+    connection = await db.connect();
+    const result = await db.login(connection, host, email, password, deviceType);
 
-    try {
-      const match = await bcrypt.compare(password, user.contrasena_hash);
+    return res.status(201).json({
+      result
+    });
+  } catch(error){
 
-      if (!match) {
-        return res.status(401).json({
-          error: 'invalid credentials'
-        });
-      }
-
-      return res.status(200).json({
-        message: 'login successful',
-        user: {
-          id: user.id_cuenta,
-          email: user.correo
-        }
-      });
-
-    } catch (error) {
-      return res.status(500).json({
-        error: error.message
-      });
-    }
-  });
+  }
 });
+
+
+
+
 
 app.put('/end_session', (req, res) => {
   const { id_session } = req.body;
@@ -194,6 +172,9 @@ app.put('/end_session', (req, res) => {
     }
   });
 });
+
+
+
 
 
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
