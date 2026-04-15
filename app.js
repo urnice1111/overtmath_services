@@ -1,133 +1,132 @@
 import express from 'express'
-import bcrypt from 'bcrypt'
 import mysql from 'mysql2'
+import db from './overmath_db.mjs'
 
 const app = express()
-const port = 3000
-
-// const { connect } = require('node:http2')
-
-const connection = mysql.createConnection({
-  host: '127.0.0.1',
-  port: 3307,
-  user: 'root',
-  password: '',
-  database: 'over_math'
-})
-
-connection.connect()
+const port = process.env.PORT ?? 8080;
+const ipAddress = process.env.C9_HOSTNAME ?? 'localhost';
 
 app.use(express.json())
+app.use(express.json());
 
 app.post('/register', async (req, res) => {
-    try{
-      const {email, password} = req.body;
+  const { email, password } = req.body;
+  let connection;
+  let host = 'https://${req.hostname}';
 
-      if (!email || !password) {
-        return res.status(400).json({
-          error: "email or password missing"
-        });
-      }
-
-      const salt_round = 10;
-      const hashedPassword = await bcrypt.hash(password, salt_round)
-
-      const sql = 'INSERT INTO cuenta (correo, contrasena_hash) VALUES (?, ?)';
-
-      connection.execute(sql, [email, hashedPassword], (err, result) => {
-        if(err){
-          if (err.code == 'ER_DUP_ENTRY'){
-            return res.status(409).json({
-              error : "user already exists"
-            });
-          }
-          console.error(err)
-          return res.status(500).json({
-            error: err.message
-          });
-        }
-
-        res.status(201).json({
-          message: "user created succesfully"
-        });
-      });
-    } catch(err){
-      console.error(err)
-      return res.status(500).json({
-        error: err.message
+  try {
+    if (!email || !password) {
+      return res.status(400).json({
+        error: 'email or password missing'
       });
     }
+
+    connection = await db.connect();
+    await db.register(connection, host, email, password);
+
+    return res.status(201).json({
+      message: 'user created successfully'
+    });
+
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({
+        error: 'user already exists'
+      });
+    }
+
+    console.error(err);
+    return res.status(500).json({
+      error: err.message
+    });
+
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
 });
 
-app.get('/get_questions/:island/:difficulty', (req, res) => {
+app.get('/get_questions/:island/:difficulty', async (req, res) => {
     const { island, difficulty } = req.params;
+    let connection;
+    let host = `https://${req.hostname}`;
 
-    const sql = `
-        SELECT *
-        FROM pregunta p
-        JOIN nivel n ON p.nivel = n.id_nivel
-        JOIN isla i ON i.id_isla = n.isla
-        WHERE i.nombre = ?
-          AND n.dificultad = ?
-    `;
+    try {
+      connection = await db.connect();
+      const result = await db.getQuestions(connection, host, island, difficulty);
+      res.json(result);
 
-    connection.query(sql, [island, difficulty], (err, rows) => {
-        if (err) {
-            console.error(err);
-            res.status(500).json({ error: err.message });
-            return;
-        }
-
-        res.json({ items: rows });
-    });
+    } catch(err) {
+        const {name, message} = err;
+        res.status(500).json({name, message});
+    } finally {
+      if (connection){
+        await connection.end();
+      }
+    }
 });
 
 /*
   Get top N (5) players
 */
-app.get('/get_scoreboard', (req, res) => {
-  const sql = `
-        SELECT *
-        FROM jugador
-        ORDER BY score_global DESC
-        LIMIT 10;
-        `;
+app.get('/get_scoreboard', async (req, res) => {
+  let connection;
+  let host = `https://${req.hostname}`;
 
-  connection.query(sql, (err, rows) => {
-        if (err) {
-            console.error(err);
-            res.status(500).json({ error: err.message });
-            return;
-        }
-
-        res.json({ top_players: rows });
-    });
+  try{
+    connection = await db.connect();
+    const result = await db.getScoreboard(connection, host);
+    res.json(result);
+  } catch(err){
+      const {name, message} = err;
+      res.status(500).json({name, message});
+  } finally {
+    if (connection){
+      await connection.end();
+    }
+  }
 });
 
-app.put('/set_login_user', (req, res) => {
-  const { userId } = req.body;
+
+app.put('/set_login_user', async (req, res) => {
+  const { deviceType, userId } = req.body;
 
   if (!userId) {
     return res.status(400).json({ error: 'userId missing' });
   }
 
-  const sql = `
-    INSERT INTO registro (fecha_hora_incicio, cuenta)
-    VALUES (CURRENT_TIMESTAMP, ?)
-  `;
+  let connection;
+  let host = `https://${req.hostname}`;
 
-  connection.execute(sql, [userId], (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+  try{
+    connection = await db.connect();
+    const result = await db.setLoginUser(connection, host, userId, deviceType);
 
     return res.status(201).json({
-      message: 'session start recorded',
-      registroId: result.insertId,
-      userId: userId
+      message: 'login set successfully',
     });
-  });
+
+  }catch(err){
+      const {name, message} = err;
+      res.status(500).json({name, message});
+  } finally {
+    if (connection){
+      await connection.end();
+    }
+  }
 });
+
+
+
+
+
+
+
+
+
+
+
 
 
 app.post('/login', (req, res) => {
@@ -183,8 +182,8 @@ app.post('/login', (req, res) => {
 
 app.put('/end_session', (req, res) => {
   const { id_session } = req.body;
-  const sql = `UPDATE registro 
-             SET fecha_hora_fin = NOW() 
+  const sql = `UPDATE registro
+             SET fecha_hora_fin = NOW()
              WHERE id_registro = ? AND fecha_hora_fin IS NULL`;
   connection.query(sql, [id_session], (err, result) => {
     if (err) {
@@ -200,7 +199,7 @@ app.put('/end_session', (req, res) => {
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
   app.listen(port, () => {
     console.log(
-      `Server listening`);
+      `http://${ ipAddress }:${ port }`);
   });
 }
 

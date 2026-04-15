@@ -1,3 +1,5 @@
+--SET FOREIGN_KEY_CHECKS = 0;
+
 DROP DATABASE IF EXISTS over_math;
 CREATE DATABASE over_math;
 USE over_math;
@@ -9,7 +11,7 @@ CREATE TABLE cuenta(
 	contrasena_hash VARCHAR(255) NOT NULL,
 	rol ENUM('admin', 'tutor', 'jugador') NOT NULL,
 	activo BOOL DEFAULT FALSE,
-	fecha_creacion DATE DEFAULT CURRENT_DATE()
+	fecha_creacion DATE DEFAULT (CURRENT_DATE)
 );
 
 
@@ -63,9 +65,9 @@ CREATE TABLE tutor_jugador(
 	id_jugador INT NOT NULL,
 	id_tutor INT NOT NULL,
 	parentezco VARCHAR(50),
-	
+
 	PRIMARY KEY(id_jugador, id_tutor),
-	
+
 	FOREIGN KEY (id_jugador) REFERENCES jugador(id_jugador),
 	FOREIGN KEY (id_tutor) REFERENCES tutor(id_tutor)
 );
@@ -83,10 +85,10 @@ DROP TABLE IF EXISTS jugador_personaje;
 CREATE TABLE jugador_personaje(
 	id_personaje INT NOT NULL,
 	id_jugador INT NOT NULL,
-	fecha_desbloqueo DATE DEFAULT CURRENT_DATE(),
-	
+	fecha_desbloqueo DATE DEFAULT (CURRENT_DATE),
+
 	PRIMARY KEY (id_personaje, id_jugador),
-	
+
 	FOREIGN KEY (id_personaje) REFERENCES personaje(id_personaje),
 	FOREIGN KEY (id_jugador) REFERENCES jugador(id_jugador)
 );
@@ -107,7 +109,7 @@ CREATE TABLE nivel(
 	puntaje_aceptable INT NOT NULL,
 	dificultad VARCHAR(10) NOT NULL,
 	isla INT NOT NULL,
-	
+
 	FOREIGN KEY (isla) REFERENCES isla(id_isla)
 );
 
@@ -136,7 +138,7 @@ CREATE TABLE pregunta(
 	problema VARCHAR(50) NOT NULL,
 	nivel INT NOT NULL,
 	respuesta_correcta INT NOT NULL,
-	
+
 	FOREIGN KEY (nivel) REFERENCES nivel(id_nivel)
 );
 
@@ -148,9 +150,9 @@ CREATE TABLE intento_pregunta(
 	respuesta_usuario VARCHAR(50),
 	es_correcto BOOL NOT NULL,
 	tiempo_respuesta_seg INT NOT NULL,
-	
+
 	PRIMARY KEY ip_primary_key (id_pregunta, id_partida),
-	
+
 	FOREIGN KEY (id_pregunta) REFERENCES pregunta(id_pregunta),
 	FOREIGN KEY (id_partida) REFERENCES partida(id_partida)
 );
@@ -161,10 +163,12 @@ CREATE TABLE progreso(
 	id_nivel INT NOT NULL,
 	id_partida INT NOT NULL,
 	id_jugador INT NOT NULL,
-	
+
 	PRIMARY KEY npj_primary_key (id_nivel, id_partida, id_jugador),
-	
+
 	FOREIGN KEY (id_nivel) REFERENCES nivel(id_nivel),
 	FOREIGN KEY (id_partida) REFERENCES partida(id_partida),
 	FOREIGN KEY (id_jugador) REFERENCES jugador(id_jugador)
 );
+
+--SET FOREIGN_KEY_CHECKS = 1;
