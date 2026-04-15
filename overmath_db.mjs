@@ -68,6 +68,9 @@ async function getScoreboard(connection, host){
     return result;
 }
 
+/*
+    Auxiliary method for login() that insert into the historial_login table
+*/
 async function setLoginUser(connection, host, userId, deviceType){
     const sqlQuery = `
         INSERT INTO historial_login (fecha_hora, exito, dispositivo, cuenta)
@@ -83,7 +86,10 @@ async function setLoginUser(connection, host, userId, deviceType){
     }
 }
 
-
+/*
+    Main method for user loing that first validated credentials and then
+    calls setLoginUser() for updating the historial_login table
+*/
 async function login(connection, host, email, password, deviceType) {
     const sqlQuery = `
         SELECT id_cuenta, correo, contrasena_hash
@@ -125,5 +131,5 @@ async function login(connection, host, email, password, deviceType) {
 
 
 export default{
-    connect, register, getQuestions, getScoreboard, setLoginUser, login
+    connect, register, getQuestions, getScoreboard, login
 };

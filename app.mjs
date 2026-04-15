@@ -119,20 +119,20 @@ app.post('/login', async (req, res) => {
 
 
 
-app.put('/end_session', (req, res) => {
-  const { id_session } = req.body;
-  const sql = `UPDATE registro
-             SET fecha_hora_fin = NOW()
-             WHERE id_registro = ? AND fecha_hora_fin IS NULL`;
-  connection.query(sql, [id_session], (err, result) => {
-    if (err) {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    } else {
-      res.status(201).json({ message: "Session ended successfully" });
-    }
-  });
-});
+// app.put('/end_session', (req, res) => {
+//   const { id_session } = req.body;
+//   const sql = `UPDATE registro
+//             SET fecha_hora_fin = NOW()
+//             WHERE id_registro = ? AND fecha_hora_fin IS NULL`;
+//   connection.query(sql, [id_session], (err, result) => {
+//     if (err) {
+//       console.error(err);
+//       res.status(500).json({ error: err.message });
+//     } else {
+//       res.status(201).json({ message: "Session ended successfully" });
+//     }
+//   });
+// });
 
 
 
