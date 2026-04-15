@@ -137,7 +137,7 @@ app.post('/login', (req, res) => {
       error: 'email or password missing'
     });
   }
-
+//a
   const sql = 'SELECT id_cuenta, correo, contrasena_hash FROM cuenta WHERE correo = ?';
 
   connection.execute(sql, [email], async (err, results) => {
