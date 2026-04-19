@@ -135,8 +135,7 @@ app.post('/register_jugador', async (req, res) => {
     );
 
     return res.status(201).json({
-      message: 'Jugador registrado correctamente',
-      result
+      message: 'Jugador registrado correctamente'
     });
   } catch (error) {
     console.error("Register Error:", error.message);
