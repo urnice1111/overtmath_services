@@ -6,7 +6,6 @@ const app = express()
 const port = process.env.PORT ?? 8080;
 const ipAddress = process.env.C9_HOSTNAME ?? 'localhost';
 
-app.use(express.json())
 app.use(express.json());
 
 app.post('/register', async (req, res) => {
@@ -99,7 +98,6 @@ app.post('/login', async (req, res) => {
     });
   }
 
-
   let connection;
   let host = `https://${req.hostname}`;
 
@@ -107,11 +105,14 @@ app.post('/login', async (req, res) => {
     connection = await db.connect();
     const result = await db.login(connection, host, email, password, deviceType);
 
-    return res.status(201).json({
-      result
-    });
-  } catch(error){
+    if (!result.ok) {
+      return res.status(401).json({ result });
+    }
 
+    return res.status(201).json({ result });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
