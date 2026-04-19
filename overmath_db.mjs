@@ -27,6 +27,22 @@ async function register(connection, host, email, password) {
     }
 }
 
+async function register_jugador(connection, email, username, password, name, last_name, date) {
+    const salt_round = 10;
+    const hashedPassword = await bcrypt.hash(password, salt_round);
+
+    const sqlQuery = 'CALL registrar_jugador(?, ?, ?, ?, ?, ?);';
+
+    try {
+        const [result] = await connection.execute(sqlQuery, [email, hashedPassword, name, last_name, username, date]);
+        console.log(result);
+        return result;
+    } catch (error) {
+        console.error("Database Error:", error.message);
+        throw error;
+    }
+}
+
 async function getQuestions(connection, host, island, difficulty){
     const sqlQuery = `
         SELECT *
@@ -129,7 +145,6 @@ async function login(connection, host, email, password, deviceType) {
 
 
 
-
 export default{
-    connect, register, getQuestions, getScoreboard, login
+    connect, register, getQuestions, getScoreboard, login, register_jugador
 };

@@ -116,7 +116,35 @@ app.post('/login', async (req, res) => {
   }
 });
 
+app.post('/register_jugador', async (req, res) => {
+  const { email, username, password, name, last_name, date } = req.body;
 
+  let connection;
+  let host = `https://${req.hostname}`;
+
+  try {
+    connection = await db.connect();
+    const result = await db.register_jugador(
+      connection,
+      email,
+      username,
+      password,
+      name,
+      last_name,
+      date
+    );
+
+    return res.status(201).json({
+      message: 'Jugador registrado correctamente',
+      result
+    });
+  } catch (error) {
+    console.error("Register Error:", error.message);
+    return res.status(500).json({ error: error.message });
+  } finally {
+    if (connection) connection.release();
+  }
+});
 
 
 
