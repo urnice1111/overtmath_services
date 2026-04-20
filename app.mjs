@@ -1,11 +1,13 @@
 import express from 'express'
 import mysql from 'mysql2'
+import cors from 'cors'
 import db from './overmath_db.mjs'
 
 const app = express()
 const port = process.env.PORT ?? 8080;
 const ipAddress = process.env.C9_HOSTNAME ?? 'localhost';
 
+app.use(cors())
 app.use(express.json());
 
 app.post('/register', async (req, res) => {
