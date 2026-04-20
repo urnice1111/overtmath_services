@@ -186,8 +186,8 @@ app.post('/login_tutor_admin', async (req, res) => {
     return res.status(400).json({ error: 'Faltan campos obligatorios (email, password, rol).' })
   }
 
-  if (!['tutor', 'administrador'].includes(rol)) {
-    return res.status(400).json({ error: 'Rol debe ser "tutor" o "administrador".' })
+  if (!['tutor', 'admin'].includes(rol)) {
+    return res.status(400).json({ error: 'Rol debe ser "tutor" o "admin".' })
   }
 
   let connection
