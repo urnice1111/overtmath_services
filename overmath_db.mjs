@@ -281,6 +281,22 @@ async function login(connection, host, email, password, deviceType) {
         throw error;
     }
 }
+
+async function register_admin(connection, email, password, name, last_name) {
+    const salt_round = 10;
+    const hashedPassword = await bcrypt.hash(password, salt_round);
+
+    const sqlCuenta = 'INSERT INTO cuenta (correo, contrasena_hash, rol) VALUES (?, ?, "admin")';
+    const [cuentaResult] = await connection.execute(sqlCuenta, [email, hashedPassword]);
+
+    const id_cuenta = cuentaResult.insertId;
+
+    const sqlAdmin = 'INSERT INTO administrador (primer_nombre, apellidos, cuenta) VALUES (?, ?, ?)';
+    await connection.execute(sqlAdmin, [name, last_name, id_cuenta]);
+
+    return { id_cuenta };
+}
+
 async function loginTutorAdmin(connection, email, password, deviceType, rol) {
     const sqlQuery = `
         SELECT id_cuenta, correo, contrasena_hash, rol
@@ -319,5 +335,6 @@ async function loginTutorAdmin(connection, email, password, deviceType, rol) {
 
 export default{
     connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
-    crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin
+    crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
+    register_admin
 };

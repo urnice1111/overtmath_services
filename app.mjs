@@ -153,6 +153,31 @@ app.get('/get_scoreboard', async (req, res) => {
     }
   }
 });
+app.post('/register_admin', async (req, res) => {
+  const { email, password, name, last_name } = req.body
+
+  if (!email || !password || !name || !last_name) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios (email, password, name, last_name).' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.register_admin(connection, email, password, name, last_name)
+    return res.status(201).json({
+      message: 'Administrador registrado exitosamente.',
+      id_cuenta: result.id_cuenta
+    })
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Ya existe una cuenta con ese correo.' })
+    }
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
 app.post('/login_tutor_admin', async (req, res) => {
   const { email, password, deviceType, rol } = req.body
