@@ -48,6 +48,71 @@ app.post('/register', async (req, res) => {
   }
 });
 
+// --- Solicitudes de vinculación tutor ↔ jugador ---
+
+app.post('/solicitud_vinculacion', async (req, res) => {
+  const { id_cuenta, id_jugador, parentezco } = req.body
+
+  if (!id_cuenta || !id_jugador || !parentezco) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios (id_cuenta, id_jugador, parentezco).' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.crearSolicitudVinculacion(connection, id_cuenta, id_jugador, parentezco)
+    return res.status(201).json({
+      message: 'Solicitud enviada correctamente.',
+      id_solicitud: result.id_solicitud
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(err.status || 500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
+
+app.get('/solicitudes_vinculacion', async (req, res) => {
+  let connection
+
+  try {
+    connection = await db.connect()
+    const result = await db.getSolicitudesVinculacion(connection)
+    return res.json(result)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
+
+app.put('/solicitud_vinculacion/:id/resolver', async (req, res) => {
+  const { id } = req.params
+  const { estado, motivo_rechazo, id_admin } = req.body
+
+  if (!estado || !['aceptada', 'rechazada'].includes(estado)) {
+    return res.status(400).json({ error: 'Estado debe ser "aceptada" o "rechazada".' })
+  }
+
+  if (estado === 'rechazada' && !motivo_rechazo) {
+    return res.status(400).json({ error: 'Debes indicar un motivo de rechazo.' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.resolverSolicitudVinculacion(connection, id, estado, motivo_rechazo, id_admin)
+    return res.json(result)
+  } catch (err) {
+    console.error(err)
+    return res.status(err.status || 500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
+
 app.get('/get_questions/:island/:difficulty', async (req, res) => {
     const { island, difficulty } = req.params;
     let connection;
@@ -89,7 +154,39 @@ app.get('/get_scoreboard', async (req, res) => {
   }
 });
 
+app.post('/login_tutor_admin', async (req, res) => {
+  const { email, password, deviceType, rol } = req.body
 
+  if (!email || !password || !rol) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios (email, password, rol).' })
+  }
+
+  if (!['tutor', 'administrador'].includes(rol)) {
+    return res.status(400).json({ error: 'Rol debe ser "tutor" o "administrador".' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.loginTutorAdmin(connection, email, password, deviceType || 'web', rol)
+
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error })
+    }
+
+    return res.status(200).json({
+      result: {
+        ok: true,
+        user: result.user
+      }
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
 app.post('/login', async (req, res) => {
   const { email, password, deviceType } = req.body;

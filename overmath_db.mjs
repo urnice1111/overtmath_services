@@ -27,6 +27,129 @@ async function register(connection, host, email, password) {
     }
 }
 
+async function crearSolicitudVinculacion(connection, id_cuenta, id_jugador, parentezco) {
+    const [tutorRows] = await connection.execute(
+        'SELECT id_tutor FROM tutor WHERE cuenta = ?',
+        [id_cuenta]
+    );
+
+    if (tutorRows.length === 0) {
+        const err = new Error('No se encontró un tutor asociado a esta cuenta.');
+        err.status = 404;
+        throw err;
+    }
+
+    const id_tutor = tutorRows[0].id_tutor;
+
+    const [jugadorRows] = await connection.execute(
+        'SELECT id_jugador FROM jugador WHERE id_jugador = ?',
+        [id_jugador]
+    );
+
+    if (jugadorRows.length === 0) {
+        const err = new Error('No se encontró un jugador con ese ID.');
+        err.status = 404;
+        throw err;
+    }
+
+    const [existingRows] = await connection.execute(
+        "SELECT id_solicitud FROM solicitud_vinculacion WHERE id_tutor = ? AND id_jugador = ? AND estado = 'pendiente'",
+        [id_tutor, id_jugador]
+    );
+
+    if (existingRows.length > 0) {
+        const err = new Error('Ya existe una solicitud pendiente para este jugador.');
+        err.status = 409;
+        throw err;
+    }
+
+    const [linkedRows] = await connection.execute(
+        'SELECT id_jugador FROM tutor_jugador WHERE id_tutor = ? AND id_jugador = ?',
+        [id_tutor, id_jugador]
+    );
+
+    if (linkedRows.length > 0) {
+        const err = new Error('Ya estás vinculado a este jugador.');
+        err.status = 409;
+        throw err;
+    }
+
+    const [result] = await connection.execute(
+        'INSERT INTO solicitud_vinculacion (id_tutor, id_jugador, parentezco) VALUES (?, ?, ?)',
+        [id_tutor, id_jugador, parentezco]
+    );
+
+    return { id_solicitud: result.insertId };
+}
+
+async function getSolicitudesVinculacion(connection) {
+    const [rows] = await connection.execute(`
+        SELECT
+            sv.id_solicitud,
+            sv.estado,
+            sv.parentezco,
+            sv.fecha_solicitud,
+            sv.motivo_rechazo,
+            t.id_tutor,
+            t.primer_nombre AS tutor_nombre,
+            t.apellidos     AS tutor_apellidos,
+            j.id_jugador,
+            j.primer_nombre AS jugador_nombre,
+            j.apellidos     AS jugador_apellidos
+        FROM solicitud_vinculacion sv
+        JOIN tutor   t ON sv.id_tutor   = t.id_tutor
+        JOIN jugador j ON sv.id_jugador = j.id_jugador
+        ORDER BY
+            CASE sv.estado WHEN 'pendiente' THEN 0 ELSE 1 END,
+            sv.fecha_solicitud DESC
+    `);
+
+    return { solicitudes: rows };
+}
+
+async function resolverSolicitudVinculacion(connection, id_solicitud, estado, motivo_rechazo, id_admin) {
+    const [rows] = await connection.execute(
+        'SELECT id_solicitud, id_tutor, id_jugador, parentezco, estado FROM solicitud_vinculacion WHERE id_solicitud = ?',
+        [id_solicitud]
+    );
+
+    if (rows.length === 0) {
+        const err = new Error('Solicitud no encontrada.');
+        err.status = 404;
+        throw err;
+    }
+
+    const solicitud = rows[0];
+
+    if (solicitud.estado !== 'pendiente') {
+        const err = new Error('Esta solicitud ya fue resuelta.');
+        err.status = 409;
+        throw err;
+    }
+
+    await connection.execute(
+        'UPDATE solicitud_vinculacion SET estado = ?, motivo_rechazo = ?, fecha_resolucion = NOW(), id_admin = ? WHERE id_solicitud = ?',
+        [estado, motivo_rechazo || null, id_admin || null, id_solicitud]
+    );
+
+    if (estado === 'aceptada') {
+        try {
+            await connection.execute(
+                'INSERT INTO tutor_jugador (id_jugador, id_tutor, parentezco) VALUES (?, ?, ?)',
+                [solicitud.id_jugador, solicitud.id_tutor, solicitud.parentezco]
+            );
+        } catch (err) {
+            if (err.code === 'ER_DUP_ENTRY') {
+                return { message: 'Solicitud aceptada. La vinculación ya existía.' };
+            }
+            throw err;
+        }
+        return { message: 'Solicitud aceptada. Tutor vinculado al jugador.' };
+    }
+
+    return { message: 'Solicitud rechazada.' };
+}
+
 async function register_jugador(connection, email, username, password, name, last_name, date) {
     const salt_round = 10;
     const hashedPassword = await bcrypt.hash(password, salt_round);
@@ -158,9 +281,43 @@ async function login(connection, host, email, password, deviceType) {
         throw error;
     }
 }
+async function loginTutorAdmin(connection, email, password, deviceType, rol) {
+    const sqlQuery = `
+        SELECT id_cuenta, correo, contrasena_hash, rol
+        FROM cuenta
+        WHERE correo = ?
+    `;
 
+    const [rows] = await connection.execute(sqlQuery, [email]);
+
+    if (rows.length === 0) {
+        return { ok: false, status: 404, error: 'Usuario no encontrado.' };
+    }
+
+    const user = rows[0];
+
+    const match = await bcrypt.compare(password, user.contrasena_hash);
+    if (!match) {
+        return { ok: false, status: 401, error: 'Credenciales incorrectas.' };
+    }
+
+    if (user.rol !== rol) {
+        return { ok: false, status: 403, error: `Esta cuenta no tiene el rol de ${rol}.` };
+    }
+
+    await setLoginUser(connection, null, user.id_cuenta, deviceType);
+
+    return {
+        ok: true,
+        user: {
+            id_cuenta: user.id_cuenta,
+            correo: user.correo
+        }
+    };
+}
 
 
 export default{
-    connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor
+    connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
+    crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin
 };
