@@ -1,209 +1,202 @@
 import express from 'express'
-import bcrypt from 'bcrypt'
-import mysql from 'mysql2'
+import db from './overmath_db.mjs'
 
 const app = express()
 const port = 3000
 
-// const { connect } = require('node:http2')
-
-const connection = mysql.createConnection({
-  host: '127.0.0.1',
-  port: 3307,
-  user: 'root',
-  password: '',
-  database: 'over_math'
-})
-
-connection.connect()
-
 app.use(express.json())
 
 app.post('/register', async (req, res) => {
-    try{
-      const {email, password} = req.body;
+  const { email, password } = req.body
 
-      if (!email || !password) {
-        return res.status(400).json({
-          error: "email or password missing"
-        });
-      }
-
-      const salt_round = 10;
-      const hashedPassword = await bcrypt.hash(password, salt_round)
-
-      const sql = 'INSERT INTO cuenta (correo, contrasena_hash) VALUES (?, ?)';
-
-      connection.execute(sql, [email, hashedPassword], (err, result) => {
-        if(err){
-          if (err.code == 'ER_DUP_ENTRY'){
-            return res.status(409).json({
-              error : "user already exists"
-            });
-          }
-          console.error(err)
-          return res.status(500).json({
-            error: err.message
-          });
-        }
-
-        res.status(201).json({
-          message: "user created succesfully"
-        });
-      });
-    } catch(err){
-      console.error(err)
-      return res.status(500).json({
-        error: err.message
-      });
-    }
-});
-
-app.get('/get_questions/:island/:difficulty', (req, res) => {
-    const { island, difficulty } = req.params;
-
-    const sql = `
-        SELECT *
-        FROM pregunta p
-        JOIN nivel n ON p.nivel = n.id_nivel
-        JOIN isla i ON i.id_isla = n.isla
-        WHERE i.nombre = ?
-          AND n.dificultad = ?
-    `;
-
-    connection.query(sql, [island, difficulty], (err, rows) => {
-        if (err) {
-            console.error(err);
-            res.status(500).json({ error: err.message });
-            return;
-        }
-
-        res.json({ items: rows });
-    });
-});
-
-/*
-  Get top N (5) players
-*/
-app.get('/get_scoreboard', (req, res) => {
-  const sql = `
-        SELECT *
-        FROM jugador
-        ORDER BY score_global DESC
-        LIMIT 10;
-        `;
-
-  connection.query(sql, (err, rows) => {
-        if (err) {
-            console.error(err);
-            res.status(500).json({ error: err.message });
-            return;
-        }
-
-        res.json({ top_players: rows });
-    });
-});
-
-app.put('/set_login_user', (req, res) => {
-  const { userId } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId missing' });
+  if (!email || !password) {
+    return res.status(400).json({ error: 'email or password missing' })
   }
 
-  const sql = `
-    INSERT INTO registro (fecha_hora_incicio, cuenta)
-    VALUES (CURRENT_TIMESTAMP, ?)
-  `;
-
-  connection.execute(sql, [userId], (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+  let connection
+  try {
+    connection = await db.connect()
+    await db.register(connection, email, password)
+    return res.status(201).json({ message: 'user created successfully' })
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'user already exists' })
     }
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
+app.get('/get_questions/:island/:difficulty', async (req, res) => {
+  const { island, difficulty } = req.params
+  let connection
+
+  try {
+    connection = await db.connect()
+    const result = await db.getQuestions(connection, island, difficulty)
+    return res.json(result)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
+
+app.get('/get_scoreboard', async (req, res) => {
+  let connection
+
+  try {
+    connection = await db.connect()
+    const result = await db.getScoreboard(connection)
+    return res.json(result)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
+
+app.put('/set_login_user', async (req, res) => {
+  const { userId } = req.body
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId missing' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.setLoginUser(connection, userId)
     return res.status(201).json({
       message: 'session start recorded',
       registroId: result.insertId,
-      userId: userId
-    });
-  });
-});
+      userId
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
-
-app.post('/login', (req, res) => {
-  const { email, password } = req.body;
+app.post('/login', async (req, res) => {
+  const { email, password } = req.body
 
   if (!email || !password) {
-    return res.status(400).json({
-      error: 'email or password missing'
-    });
+    return res.status(400).json({ error: 'email or password missing' })
   }
 
-  const sql = 'SELECT id_cuenta, correo, contrasena_hash FROM cuenta WHERE correo = ?';
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.login(connection, email, password)
 
-  connection.execute(sql, [email], async (err, results) => {
-    if (err) {
-      return res.status(500).json({
-        error: err.message
-      });
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error })
     }
 
-    if (results.length === 0) {
-      return res.status(404).json({
-        error: 'user not found'
-      });
-    }
+    return res.status(200).json({
+      message: result.message,
+      user: result.user
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
-    const user = results[0];
+// --- Solicitudes de vinculación tutor ↔ jugador ---
 
-    try {
-      const match = await bcrypt.compare(password, user.contrasena_hash);
+app.post('/solicitud_vinculacion', async (req, res) => {
+  const { id_cuenta, id_jugador, parentezco } = req.body
 
-      if (!match) {
-        return res.status(401).json({
-          error: 'invalid credentials'
-        });
-      }
+  if (!id_cuenta || !id_jugador || !parentezco) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios (id_cuenta, id_jugador, parentezco).' })
+  }
 
-      return res.status(200).json({
-        message: 'login successful',
-        user: {
-          id: user.id_cuenta,
-          email: user.correo
-        }
-      });
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.crearSolicitudVinculacion(connection, id_cuenta, id_jugador, parentezco)
+    return res.status(201).json({
+      message: 'Solicitud enviada correctamente.',
+      id_solicitud: result.id_solicitud
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(err.status || 500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
-    } catch (error) {
-      return res.status(500).json({
-        error: error.message
-      });
-    }
-  });
-});
+app.get('/solicitudes_vinculacion', async (req, res) => {
+  let connection
 
-app.put('/end_session', (req, res) => {
-  const { id_session } = req.body;
-  const sql = `UPDATE registro 
-             SET fecha_hora_fin = NOW() 
-             WHERE id_registro = ? AND fecha_hora_fin IS NULL`;
-  connection.query(sql, [id_session], (err, result) => {
-    if (err) {
-      console.error(err);
-      res.status(500).json({ error: err.message });
-    } else {
-      res.status(201).json({ message: "Session ended successfully" });
-    }
-  });
-});
+  try {
+    connection = await db.connect()
+    const result = await db.getSolicitudesVinculacion(connection)
+    return res.json(result)
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
+app.put('/solicitud_vinculacion/:id/resolver', async (req, res) => {
+  const { id } = req.params
+  const { estado, motivo_rechazo, id_admin } = req.body
+
+  if (!estado || !['aceptada', 'rechazada'].includes(estado)) {
+    return res.status(400).json({ error: 'Estado debe ser "aceptada" o "rechazada".' })
+  }
+
+  if (estado === 'rechazada' && !motivo_rechazo) {
+    return res.status(400).json({ error: 'Debes indicar un motivo de rechazo.' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.resolverSolicitudVinculacion(connection, id, estado, motivo_rechazo, id_admin)
+    return res.json(result)
+  } catch (err) {
+    console.error(err)
+    return res.status(err.status || 500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
+
+app.put('/end_session', async (req, res) => {
+  const { id_session } = req.body
+  let connection
+
+  try {
+    connection = await db.connect()
+    await db.endSession(connection, id_session)
+    return res.status(201).json({ message: 'Session ended successfully' })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: err.message })
+  } finally {
+    if (connection) connection.release()
+  }
+})
 
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
   app.listen(port, () => {
-    console.log(
-      `Server listening`);
-  });
+    console.log(`Server listening on port ${port}`)
+  })
 }
 
-
-
-export default app;
+export default app
