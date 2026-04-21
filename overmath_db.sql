@@ -171,4 +171,154 @@ CREATE TABLE progreso(
 	FOREIGN KEY (id_jugador) REFERENCES jugador(id_jugador)
 );
 
+
+DROP TABLE IF EXISTS solicitud_vinculacion;
+CREATE TABLE solicitud_vinculacion (
+    id_solicitud INT AUTO_INCREMENT PRIMARY KEY,
+    id_tutor INT NOT NULL,
+    id_jugador INT NOT NULL,
+    parentezco VARCHAR(50) NOT NULL,
+    estado ENUM('pendiente', 'aceptada', 'rechazada') DEFAULT 'pendiente',
+    motivo_rechazo TEXT,
+    fecha_solicitud DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_resolucion DATETIME,
+    id_admin INT,
+
+    FOREIGN KEY (id_tutor) REFERENCES tutor(id_tutor),
+    FOREIGN KEY (id_jugador) REFERENCES jugador(id_jugador),
+    FOREIGN KEY (id_admin) REFERENCES administrador(id_administrador)
+);
+
+
+
+DROP PROCEDURE IF EXISTS registrar_jugador;
+DELIMITER $$
+
+CREATE PROCEDURE registrar_jugador(
+    IN p_correo VARCHAR(100),
+    IN p_contrasena_hash VARCHAR(255),
+    IN p_primer_nombre VARCHAR(100),
+    IN p_apellidos VARCHAR(150),
+    IN p_nombre_usuario VARCHAR(20),
+    IN p_fecha_nacimiento DATE
+)
+BEGIN
+    DECLARE v_id_cuenta INT;
+    DECLARE v_existe_correo INT DEFAULT 0;
+    DECLARE v_existe_usuario INT DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    SELECT COUNT(*) INTO v_existe_correo
+    FROM cuenta
+    WHERE correo = p_correo;
+
+    IF v_existe_correo > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El correo ya está registrado';
+    END IF;
+
+    SELECT COUNT(*) INTO v_existe_usuario
+    FROM jugador
+    WHERE nombre_usuario = p_nombre_usuario;
+
+    IF v_existe_usuario > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El nombre de usuario ya existe';
+    END IF;
+
+    INSERT INTO cuenta(correo, contrasena_hash, rol, activo)
+    VALUES (p_correo, p_contrasena_hash, 'jugador', TRUE);
+
+    SET v_id_cuenta = LAST_INSERT_ID();
+
+    INSERT INTO jugador(
+        primer_nombre,
+        apellidos,
+        score_global,
+        nombre_usuario,
+        fecha_nacimiento,
+        tutorial_completado,
+        cuenta
+    )
+    VALUES (
+        p_primer_nombre,
+        p_apellidos,
+        0,
+        p_nombre_usuario,
+        p_fecha_nacimiento,
+        FALSE,
+        v_id_cuenta
+    );
+
+    COMMIT;
+END$$
+
+DELIMITER ;
+
+
+
+DROP PROCEDURE IF EXISTS registrar_tutor;
+DELIMITER $$
+
+CREATE PROCEDURE registrar_tutor(
+    IN p_correo VARCHAR(100),
+    IN p_contrasena_hash VARCHAR(255),
+    IN p_primer_nombre VARCHAR(100),
+    IN p_apellidos VARCHAR(150),
+    IN p_telefono VARCHAR(25)
+)
+BEGIN
+    DECLARE v_id_cuenta INT;
+    DECLARE v_existe_correo INT DEFAULT 0;
+
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    SELECT COUNT(*) INTO v_existe_correo
+    FROM cuenta
+    WHERE correo = p_correo;
+
+    IF v_existe_correo > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'El correo ya está registrado';
+    END IF;
+
+
+    INSERT INTO cuenta(correo, contrasena_hash, rol, activo)
+    VALUES (p_correo, p_contrasena_hash, 'tutor', FALSE);
+
+    SET v_id_cuenta = LAST_INSERT_ID();
+
+    INSERT INTO tutor(
+        primer_nombre,
+        apellidos,
+        telefono,
+        cuenta
+    )
+    VALUES (
+        p_primer_nombre,
+        p_apellidos,
+        p_telefono,
+        v_id_cuenta
+    );
+
+    COMMIT;
+END$$
+
+DELIMITER ;
+
+
+
 --SET FOREIGN_KEY_CHECKS = 1;
