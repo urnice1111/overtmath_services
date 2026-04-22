@@ -199,4 +199,47 @@ if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
   })
 }
 
+app.post('/save_progress', async (req, res) => {
+  const { id_jugador, score_max, tiempo_seg, fecha_hora, nivel, intentos } = req.body;
+
+  if (!id_jugador || !nivel || !intentos) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios (id_jugador, nivel, intentos).' });
+  }
+
+  let connection;
+  try {
+    connection = await db.connect();
+
+    // Guardar partida
+    const partidaResult = await db.savePartida(connection, {
+      id_jugador,
+      score_max,
+      tiempo_seg,
+      fecha_hora,
+      nivel
+    });
+
+    const id_partida = partidaResult.insertId;
+
+    // Guardar intentos
+    for (const intento of intentos) {
+      await db.saveIntentoPregunta(connection, {
+        id_partida,
+        id_pregunta: intento.id_pregunta,
+        respuesta_usuario: intento.respuesta_usuario,
+        es_correcta: intento.es_correcta,
+        tiempo_respuesta_seg: intento.tiempo_respuesta_seg
+      });
+    }
+
+    return res.status(201).json({ message: 'Progreso guardado correctamente', id_partida });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+
 export default app

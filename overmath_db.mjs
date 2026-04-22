@@ -332,9 +332,26 @@ async function loginTutorAdmin(connection, email, password, deviceType, rol) {
     };
 }
 
+async function savePartida(connection, { id_jugador, score_max, tiempo_seg, fecha_hora, nivel }) {
+  const [result] = await connection.execute(
+    'INSERT INTO partida (id_jugador, score_max, tiempo_seg, fecha_hora, nivel) VALUES (?, ?, ?, ?, ?)',
+    [id_jugador, score_max, tiempo_seg, fecha_hora, nivel]
+  );
+  return result;
+}
+
+async function saveIntentoPregunta(connection, { id_partida, id_pregunta, respuesta_usuario, es_correcta, tiempo_respuesta_seg }) {
+  const [result] = await connection.execute(
+    'INSERT INTO intento_pregunta (id_partida, id_pregunta, respuesta_usuario, es_correcta, tiempo_respuesta_seg) VALUES (?, ?, ?, ?, ?)',
+    [id_partida, id_pregunta, respuesta_usuario, es_correcta, tiempo_respuesta_seg]
+  );
+  return result;
+}
+
+
 
 export default{
     connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
     crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
-    register_admin
+    register_admin, savePartida, saveIntentoPregunta
 };
