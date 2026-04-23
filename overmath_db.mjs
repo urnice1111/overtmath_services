@@ -2,8 +2,9 @@ import mysql from 'mysql2/promise';
 import bcrypt from 'bcrypt'
 
 
-async function connect() {
-  return await mysql.createConnection({
+//async function connect() {
+//  return await mysql.createConnection({
+const pool = mysql.createPool({    
     host: 'overmath.c835uhzb6xlq.us-east-1.rds.amazonaws.com', // tu host de RDS
     port: 3306,                                                // puerto por defecto
     user: 'admin',                                             // tu usuario
@@ -13,6 +14,10 @@ async function connect() {
     connectionLimit: 10,
     queueLimit: 0
   });
+//}
+
+async function connect() {
+  return pool.getConnection(); // este sí tiene .release()
 }
 
 async function register(connection, host, email, password) {
@@ -357,8 +362,18 @@ async function saveIntentoPregunta(connection, { id_partida, id_pregunta, respue
   return result;
 }
 
+// Función para guardar progreso
+async function saveProgreso(connection, { id_jugador, id_nivel, id_partida }) {
+  const [result] = await connection.execute(
+    `INSERT INTO progreso (id_jugador, id_nivel, id_partida)
+     VALUES (?, ?, ?)`,
+    [id_jugador, id_nivel, id_partida]
+  );
+  return result;
+}
+
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
-  register_admin, savePartida, saveIntentoPregunta
+  register_admin, savePartida, saveIntentoPregunta, saveProgreso
 };

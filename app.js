@@ -246,6 +246,18 @@ app.post('/save_progress', async (req, res) => {
       });
     }
 
+    try {
+      await db.saveProgreso(connection, { id_jugador: jugador, id_nivel: nivel, id_partida });
+    } catch (e) {
+      console.error("Error al guardar progreso:", e);
+    }
+
+    /* await db.saveProgreso(connection, {
+      id_jugador: jugador,
+      id_nivel: nivel,
+      id_partida
+    }); */
+
     return res.status(201).json({ message: 'Progreso guardado correctamente', id_partida });
   } catch (err) {
     console.error(err);
