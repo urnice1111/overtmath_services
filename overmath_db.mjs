@@ -4,10 +4,14 @@ import bcrypt from 'bcrypt'
 
 async function connect() {
   return await mysql.createConnection({
-    host: process.env.MYSQL_HOST,
-    user: process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: 'over_math'
+    host: 'overmath.c835uhzb6xlq.us-east-1.rds.amazonaws.com', // tu host de RDS
+    port: 3306,                                                // puerto por defecto
+    user: 'admin',                                             // tu usuario
+    password: 'xhbBYv7613-alhdb7',                              // tu contraseña
+    database: 'over_math',                                     // nombre de la base
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
   });
 }
 
@@ -332,26 +336,29 @@ async function loginTutorAdmin(connection, email, password, deviceType, rol) {
     };
 }
 
-async function savePartida(connection, { id_jugador, score_max, tiempo_seg, fecha_hora, nivel }) {
+// Función para guardar partida
+async function savePartida(connection, { jugador, score_max, tiempo_seg, fecha_hora, nivel }) {
   const [result] = await connection.execute(
-    'INSERT INTO partida (id_jugador, score_max, tiempo_seg, fecha_hora, nivel) VALUES (?, ?, ?, ?, ?)',
-    [id_jugador, score_max, tiempo_seg, fecha_hora, nivel]
+    `INSERT INTO partida (score_max, fecha_hora, tiempo_seg, nivel, jugador)
+     VALUES (?, ?, ?, ?, ?)`,
+    [score_max, fecha_hora, tiempo_seg, nivel, jugador]
   );
   return result;
 }
 
-async function saveIntentoPregunta(connection, { id_partida, id_pregunta, respuesta_usuario, es_correcta, tiempo_respuesta_seg }) {
+// Función para guardar intento de pregunta
+async function saveIntentoPregunta(connection, { id_partida, id_pregunta, respuesta_usuario, es_correcto, tiempo_respuesta_seg }) {
   const [result] = await connection.execute(
-    'INSERT INTO intento_pregunta (id_partida, id_pregunta, respuesta_usuario, es_correcta, tiempo_respuesta_seg) VALUES (?, ?, ?, ?, ?)',
-    [id_partida, id_pregunta, respuesta_usuario, es_correcta, tiempo_respuesta_seg]
+    `INSERT INTO intento_pregunta 
+     (id_partida, id_pregunta, respuesta_usuario, es_correcto, tiempo_respuesta_seg) 
+     VALUES (?, ?, ?, ?, ?)`,
+    [id_partida, id_pregunta, respuesta_usuario, es_correcto, tiempo_respuesta_seg]
   );
   return result;
 }
 
-
-
-export default{
-    connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
-    crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
-    register_admin, savePartida, saveIntentoPregunta
+export default {
+  connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
+  crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
+  register_admin, savePartida, saveIntentoPregunta
 };

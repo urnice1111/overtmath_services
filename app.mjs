@@ -10,6 +10,7 @@ const ipAddress = process.env.C9_HOSTNAME ?? 'localhost';
 app.use(cors())
 app.use(express.json());
 
+
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
   let connection;

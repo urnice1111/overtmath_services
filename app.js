@@ -1,9 +1,11 @@
 import express from 'express'
+import cors from 'cors'; 
 import db from './overmath_db.mjs'
 
 const app = express()
 const port = 3000
 
+app.use(cors())
 app.use(express.json())
 
 app.post('/register', async (req, res) => {
@@ -199,20 +201,32 @@ if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
   })
 }
 
+// Endpoint para guardar progreso
 app.post('/save_progress', async (req, res) => {
-  const { id_jugador, score_max, tiempo_seg, fecha_hora, nivel, intentos } = req.body;
+  const { jugador, score_max, tiempo_seg, fecha_hora, nivel, intentos } = req.body;
 
-  if (!id_jugador || !nivel || !intentos) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios (id_jugador, nivel, intentos).' });
+  if (!jugador || !nivel || !intentos) {
+    return res.status(400).json({ error: "Faltan campos obligatorios (jugador, nivel, intentos)." });
   }
 
   let connection;
   try {
     connection = await db.connect();
 
-    // Guardar partida
+    // Validar que el jugador existe
+    const [jugadorRows] = await connection.execute(
+      'SELECT id_jugador FROM jugador WHERE id_jugador = ?',
+      [jugador]
+    );
+
+    if (jugadorRows.length === 0) {
+      return res.status(400).json({ error: `El jugador ${jugador} no existe.` });
+    }
+
+
+    // Guardar partida (siempre crea una nueva fila con id_partida AUTO_INCREMENT)
     const partidaResult = await db.savePartida(connection, {
-      id_jugador,
+      jugador,
       score_max,
       tiempo_seg,
       fecha_hora,
@@ -221,13 +235,13 @@ app.post('/save_progress', async (req, res) => {
 
     const id_partida = partidaResult.insertId;
 
-    // Guardar intentos
+    // Guardar intentos asociados a la partida recién creada
     for (const intento of intentos) {
       await db.saveIntentoPregunta(connection, {
         id_partida,
         id_pregunta: intento.id_pregunta,
         respuesta_usuario: intento.respuesta_usuario,
-        es_correcta: intento.es_correcta,
+        es_correcto: intento.es_correcto,
         tiempo_respuesta_seg: intento.tiempo_respuesta_seg
       });
     }
@@ -241,5 +255,4 @@ app.post('/save_progress', async (req, res) => {
   }
 });
 
-
-export default app
+export default app;

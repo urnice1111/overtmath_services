@@ -5,7 +5,25 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "mysql": "^2.18.1",
-    "mysql2": "^3.22.1"
+    "mysql2": "^3.22.2"
   },
-  "type": "module"
+  "type": "module",
+  "name": "overtmath_services",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/urnice1111/overtmath_services.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/urnice1111/overtmath_services/issues"
+  },
+  "homepage": "https://github.com/urnice1111/overtmath_services#readme"
 }
