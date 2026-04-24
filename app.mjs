@@ -186,7 +186,7 @@ const handleTutorDashboard = async (req, res) => {
 }
 
 app.get('/tutor_dashboard/:idCuenta', handleTutorDashboard)
-app.get('/dashboard_tutor/:idCuenta', handleTutorDashboard)
+
 
 app.post('/register_admin', async (req, res) => {
   const { email, password, name, last_name } = req.body
