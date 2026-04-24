@@ -400,8 +400,8 @@ async function saveProgreso(connection, { id_jugador, id_nivel, id_partida }) {
 }
 
 async function getGeneralInfo(connection){
-    const queryJugadoresActivos = `
-      SELECT COUNT(DISTINCT j.id_jugador) AS jugadores_activos
+    const queryJugadoresActivos = 
+    ` SELECT COUNT(DISTINCT j.id_jugador) AS jugadores_activos
       FROM jugador j
       JOIN cuenta c ON j.cuenta = c.id_cuenta
       JOIN historial_login hl ON hl.cuenta = c.id_cuenta
@@ -409,20 +409,20 @@ async function getGeneralInfo(connection){
         AND hl.exito = 1;
     `;
 
-    const queryPartidasTotales = `
-      SELECT COUNT(id_partida) AS partidas_totales
+    const queryPartidasTotales = 
+    ` SELECT COUNT(id_partida) AS partidas_totales
       FROM partida
       WHERE fecha_hora >= NOW() - INTERVAL 7 DAY;
     `;
 
-    const queryTiempoTotal = `
-      SELECT COALESCE(SUM(tiempo_seg), 0) AS tiempo_total_jugado
+    const queryTiempoTotal = 
+    ` SELECT COALESCE(SUM(tiempo_seg), 0) AS tiempo_total_jugado
       FROM partida
       WHERE fecha_hora >= NOW() - INTERVAL 15 DAY;
     `;
 
-    const queryNivelesCompletados = `
-      SELECT COUNT(*) AS niveles_completados
+    const queryNivelesCompletados = 
+    ` SELECT COUNT(*) AS niveles_completados
       FROM partida p
       JOIN nivel n ON p.nivel = n.id_nivel
       WHERE p.score_max >= n.puntaje_aceptable
@@ -447,8 +447,143 @@ async function getGeneralInfo(connection){
     ]
 }
 
+async function getTutorDashboard(connection, idCuenta) {
+    const sqlTutor = `SELECT id_tutor, primer_nombre, apellidos
+         FROM tutor
+         WHERE cuenta = ?`;
+    const [tutorRows] = await connection.execute(sqlTutor, [idCuenta]);
+
+    if (tutorRows.length === 0) {
+        const err = new Error('No se encontro un tutor asociado a esta cuenta.');
+        err.status = 404;
+        throw err;
+    }
+
+    const tutor = tutorRows[0];
+
+    const sqlSummary = `SELECT
+            COUNT(DISTINCT tj.id_jugador) AS total_jugadores,
+            COALESCE(ROUND(AVG(j.score_global), 2), 0) AS promedio_score_global,
+            COUNT(p.id_partida) AS total_partidas
+         FROM tutor_jugador tj
+         LEFT JOIN jugador j ON j.id_jugador = tj.id_jugador
+         LEFT JOIN partida p ON p.jugador = tj.id_jugador
+         WHERE tj.id_tutor = ?`;
+    const [summaryRows] = await connection.execute(sqlSummary, [tutor.id_tutor]);
+
+    const sqlWeekly = `SELECT
+            YEARWEEK(p.fecha_hora, 1) AS year_week,
+            DATE_FORMAT(
+                DATE_SUB(DATE(p.fecha_hora), INTERVAL WEEKDAY(p.fecha_hora) DAY),
+                '%d/%m'
+            ) AS semana_inicio,
+            COALESCE(ROUND(AVG(p.score_max), 2), 0) AS puntaje_promedio,
+            COUNT(DISTINCT p.jugador) AS participacion
+         FROM partida p
+         JOIN tutor_jugador tj ON tj.id_jugador = p.jugador
+         WHERE tj.id_tutor = ?
+           AND p.fecha_hora >= NOW() - INTERVAL 6 WEEK
+         GROUP BY YEARWEEK(p.fecha_hora, 1), semana_inicio
+         ORDER BY year_week`;
+    const [weeklyRows] = await connection.execute(sqlWeekly, [tutor.id_tutor]);
+
+    const sqlTopic = `SELECT
+            pr.tema,
+            COALESCE(ROUND(100 * AVG(CASE WHEN ip.es_correcto = 1 THEN 1 ELSE 0 END), 2), 0) AS precision_pct,
+            COUNT(*) AS total_intentos
+         FROM intento_pregunta ip
+         JOIN partida p ON p.id_partida = ip.id_partida
+         JOIN pregunta pr ON pr.id_pregunta = ip.id_pregunta
+         JOIN tutor_jugador tj ON tj.id_jugador = p.jugador
+         WHERE tj.id_tutor = ?
+         GROUP BY pr.tema
+         ORDER BY precision_pct DESC`;
+    const [topicRows] = await connection.execute(sqlTopic, [tutor.id_tutor]);
+
+    const sqlTimeline = `SELECT
+            DATE_FORMAT(p.fecha_hora, '%d/%m') AS fecha,
+            CONCAT(j.primer_nombre, ' ', j.apellidos) AS jugador_nombre,
+            i.tema AS tema,
+            p.score_max AS score_max
+         FROM partida p
+         JOIN jugador j ON j.id_jugador = p.jugador
+         JOIN nivel n ON n.id_nivel = p.nivel
+         JOIN isla i ON i.id_isla = n.isla
+         JOIN tutor_jugador tj ON tj.id_jugador = p.jugador
+         WHERE tj.id_tutor = ?
+         ORDER BY p.fecha_hora DESC
+         LIMIT 8`;
+    const [timelineRows] = await connection.execute(sqlTimeline, [tutor.id_tutor]);
+
+    const summary = {
+        tutorNombre: `${tutor.primer_nombre} ${tutor.apellidos}`.trim(),
+        totalJugadores: Number(summaryRows[0]?.total_jugadores ?? 0),
+        promedioScore: Number(summaryRows[0]?.promedio_score_global ?? 0),
+        totalPartidas: Number(summaryRows[0]?.total_partidas ?? 0)
+    };
+
+    const weeklyProgress = weeklyRows.map((row, index) => ({
+        semana: `Semana ${index + 1}`,
+        etiqueta: row.semana_inicio,
+        puntaje_promedio: Number(row.puntaje_promedio ?? 0),
+        participacion: Number(row.participacion ?? 0)
+    }));
+
+    const topicAccuracy = topicRows.map((row) => ({
+        tema: row.tema,
+        precision_pct: Number(row.precision_pct ?? 0),
+        total_intentos: Number(row.total_intentos ?? 0)
+    }));
+
+    const timeline = timelineRows.map((row) => ({
+        fecha: row.fecha,
+        titulo: `${row.jugador_nombre} en ${row.tema}`,
+        detalle: `Partida registrada con puntaje ${Number(row.score_max ?? 0)}.`
+    }));
+
+    const weakestTopic = topicAccuracy.length > 0
+        ? [...topicAccuracy].sort((a, b) => a.precision_pct - b.precision_pct)[0]
+        : null;
+
+    const tips = [
+        weakestTopic
+            ? `Refuerza el tema ${weakestTopic.tema}: precision actual ${weakestTopic.precision_pct}%.`
+            : 'Registra mas actividad para obtener recomendaciones personalizadas.',
+        'Practica 10 minutos diarios en la isla con menor precision.',
+        'Reconoce mejoras semanales para mantener motivacion.'
+    ];
+
+    const badges = [
+        {
+            nombre: 'Jugadores Activos',
+            valor: `${summary.totalJugadores}`,
+            color: 'bg-emerald-500'
+        },
+        {
+            nombre: 'Partidas Guiadas',
+            valor: `${summary.totalPartidas}`,
+            color: 'bg-sky-500'
+        },
+        {
+            nombre: 'Promedio General',
+            valor: `${summary.promedioScore}`,
+            color: 'bg-amber-500'
+        }
+    ];
+
+    return {
+        summary,
+        weeklyProgress,
+        topicAccuracy,
+        timeline,
+        tips,
+        badges
+    };
+}
+
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
-  register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo
+  register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo,
+  getTutorDashboard
 };

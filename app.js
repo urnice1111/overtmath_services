@@ -62,6 +62,29 @@ app.get('/get_scoreboard', async (req, res) => {
   }
 })
 
+app.get('/tutor_dashboard/:idCuenta', async (req, res) => {
+  const idCuenta = Number(req.params.idCuenta)
+
+  if (!Number.isInteger(idCuenta) || idCuenta <= 0) {
+    return res.status(400).json({ error: 'idCuenta invalido.' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.getTutorDashboard(connection, idCuenta)
+    return res.json({ result })
+  } catch (err) {
+    console.error(err)
+    return res.status(err.status || 500).json({ error: err.message })
+  } finally {
+    if (connection) {
+      if (typeof connection.release === 'function') connection.release()
+      else if (typeof connection.end === 'function') await connection.end()
+    }
+  }
+})
+
 app.put('/set_login_user', async (req, res) => {
   const { userId } = req.body
 

@@ -83,12 +83,15 @@ app.get('/solicitudes_vinculacion', async (req, res) => {
     connection = await db.connect()
     const result = await db.getSolicitudesVinculacion(connection)
     return res.json(result)
-  } catch (err) {
+  } catch (err) 
+  {
     console.error(err)
     
 
     return res.status(500).json({ error: err.message })
-  } finally {
+  } 
+  finally 
+  {
     if (connection) connection.release()
   }
 })
@@ -158,6 +161,33 @@ app.get('/get_scoreboard', async (req, res) => {
     }
   }
 });
+
+const handleTutorDashboard = async (req, res) => {
+  const idCuenta = Number(req.params.idCuenta)
+
+  if (!Number.isInteger(idCuenta) || idCuenta <= 0) {
+    return res.status(400).json({ error: 'idCuenta invalido.' })
+  }
+
+  let connection
+  try {
+    connection = await db.connect()
+    const result = await db.getTutorDashboard(connection, idCuenta)
+    return res.json({ result })
+  } catch (err) {
+    console.error(err)
+    return res.status(err.status || 500).json({ error: err.message })
+  } finally {
+    if (connection) {
+      if (typeof connection.release === 'function') connection.release()
+      else if (typeof connection.end === 'function') await connection.end()
+    }
+  }
+}
+
+app.get('/tutor_dashboard/:idCuenta', handleTutorDashboard)
+app.get('/dashboard_tutor/:idCuenta', handleTutorDashboard)
+
 app.post('/register_admin', async (req, res) => {
   const { email, password, name, last_name } = req.body
 
