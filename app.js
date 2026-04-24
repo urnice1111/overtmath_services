@@ -10,6 +10,7 @@ app.use(express.json())
 
 app.post('/register', async (req, res) => {
   const { email, password } = req.body
+  let host = `https://${req.hostname}`;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'email or password missing' })
@@ -18,7 +19,7 @@ app.post('/register', async (req, res) => {
   let connection
   try {
     connection = await db.connect()
-    await db.register(connection, email, password)
+    await db.register(connection, host, email, password)
     return res.status(201).json({ message: 'user created successfully' })
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {
