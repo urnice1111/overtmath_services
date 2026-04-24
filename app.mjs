@@ -376,6 +376,7 @@ app.post('/save_progress', async (req, res) => {
   } finally {
     if (connection) connection.release();
   }
+  
 });app.get('/islas_progreso', async (req, res) => {
   let connection;
   let host = `https://${req.hostname}`;
