@@ -83,6 +83,8 @@ app.get('/solicitudes_vinculacion', async (req, res) => {
     return res.json(result)
   } catch (err) {
     console.error(err)
+    
+
     return res.status(500).json({ error: err.message })
   } finally {
     if (connection) connection.release()
@@ -319,7 +321,26 @@ app.post('/register_tutor', async (req, res) => {
 // });
 
 
+app.get('/islas_progreso', async (req, res) => {
+  let connection;
+  let host = `https://${req.hostname}`;
 
+  try{
+    connection = await db.connect();
+    const result = await db.getIslasProgreso(connection);
+
+    await new Promise(r => setTimeout(r, 3000));  // 3 second delay
+
+    return res.json(result);
+  }catch(err){
+      const {name, message} = err;
+      res.status(500).json({name, message});
+  } finally {
+    if (connection){
+      await connection.end();
+    }
+  }
+});
 
 
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
