@@ -137,7 +137,7 @@ app.post('/login', async (req, res) => {
   }
 })
 
-// --- Solicitudes de vinculación tutor ↔ jugador ---
+//Solicitudes de vinculación tutor
 
 app.post('/solicitud_vinculacion', async (req, res) => {
   const { id_cuenta, id_jugador, parentezco } = req.body
@@ -247,7 +247,6 @@ app.post('/save_progress', async (req, res) => {
     }
 
 
-    // Guardar partida (siempre crea una nueva fila con id_partida AUTO_INCREMENT)
     const partidaResult = await db.savePartida(connection, {
       jugador,
       score_max,

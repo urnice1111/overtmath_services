@@ -461,7 +461,8 @@ async function getTutorDashboard(connection, idCuenta) {
 
     const tutor = tutorRows[0];
 
-    const sqlSummary = `SELECT
+    const sqlSummary = 
+    `SELECT
             COUNT(DISTINCT tj.id_jugador) AS total_jugadores,
             COALESCE(ROUND(AVG(j.score_global), 2), 0) AS promedio_score_global,
             COUNT(p.id_partida) AS total_partidas
@@ -471,7 +472,8 @@ async function getTutorDashboard(connection, idCuenta) {
          WHERE tj.id_tutor = ?`;
     const [summaryRows] = await connection.execute(sqlSummary, [tutor.id_tutor]);
 
-    const sqlWeekly = `SELECT
+    const sqlWeekly = 
+    `SELECT
             YEARWEEK(p.fecha_hora, 1) AS year_week,
             DATE_FORMAT(
                 DATE_SUB(DATE(p.fecha_hora), INTERVAL WEEKDAY(p.fecha_hora) DAY),
@@ -487,7 +489,8 @@ async function getTutorDashboard(connection, idCuenta) {
          ORDER BY year_week`;
     const [weeklyRows] = await connection.execute(sqlWeekly, [tutor.id_tutor]);
 
-    const sqlTopic = `SELECT
+    const sqlTopic = 
+    `SELECT
             pr.tema,
             COALESCE(ROUND(100 * AVG(CASE WHEN ip.es_correcto = 1 THEN 1 ELSE 0 END), 2), 0) AS precision_pct,
             COUNT(*) AS total_intentos
