@@ -14,6 +14,10 @@ async function connect() {
     connectionLimit: 10,
     queueLimit: 0
   });
+//}
+
+async function connect() {
+  return pool.getConnection(); // este sí tiene .release()
 }
 
 async function register(connection, host, email, password) {
@@ -358,39 +362,8 @@ async function saveIntentoPregunta(connection, { id_partida, id_pregunta, respue
   return result;
 }
 
-
-async function getIslasProgreso(connection){
-    const sqlQuery = `SELECT
-                        j.id_jugador,
-                        j.primer_nombre AS estudiante,
-                        COALESCE(MAX(i.nombre = 'isla_suma'), 0)            AS isla_suma,
-                        COALESCE(MAX(i.nombre = 'isla_resta'), 0)           AS isla_resta,
-                        COALESCE(MAX(i.nombre = 'isla_multiplicacion'), 0)  AS isla_multiplicacion,
-                        COALESCE(MAX(i.nombre = 'isla_division'), 0)        AS isla_division,
-                        COALESCE(MAX(i.nombre = 'isla_todos'), 0)           AS isla_todos
-                        FROM jugador j
-                        LEFT JOIN partida p ON p.jugador = j.id_jugador
-                        LEFT JOIN nivel   n ON n.id_nivel = p.nivel
-                        LEFT JOIN isla    i ON i.id_isla  = n.isla
-                        GROUP BY j.id_jugador, j.primer_nombre;`
-    const [rows] =  await connection.execute(sqlQuery);
-
-    const  a = rows.map(row => ({
-        estudiante: row.estudiante,
-        islas: {
-            isla_suma: row.isla_suma ? true: false,
-            isla_resta: row.isla_resta ? true: false,
-            isla_multiplicacion: row.isla_multiplicacion ? true: false,
-            isla_division: row.isla_division ? true: false,
-            isla_todos: row.isla_todos ? true: false
-        }
-    })); 
-    
-    return a;
-}
-
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
-  register_admin, savePartida, saveIntentoPregunta, getIslasProgreso
+  register_admin, savePartida, saveIntentoPregunta
 };

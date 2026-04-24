@@ -195,11 +195,11 @@ app.put('/end_session', async (req, res) => {
   }
 })
 
-if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`)
-  })
-}
+   if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
+      app.listen(port, () => {
+        console.log(`Server listening on port ${port}`)
+      })
+    }
 
 // Endpoint para guardar progreso
 app.post('/save_progress', async (req, res) => {
@@ -245,6 +245,12 @@ app.post('/save_progress', async (req, res) => {
         tiempo_respuesta_seg: intento.tiempo_respuesta_seg
       });
     }
+
+    await db.saveProgreso(connection, {
+      id_jugador: jugador,
+      id_nivel: nivel,
+      id_partida
+    });
 
     return res.status(201).json({ message: 'Progreso guardado correctamente', id_partida });
   } catch (err) {

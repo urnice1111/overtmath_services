@@ -10,7 +10,6 @@ const ipAddress = process.env.C9_HOSTNAME ?? 'localhost';
 app.use(cors())
 app.use(express.json());
 
-
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
   let connection;
@@ -320,8 +319,64 @@ app.post('/register_tutor', async (req, res) => {
 //   });
 // });
 
+app.post('/save_progress', async (req, res) => {
+  const { jugador, score_max, tiempo_seg, fecha_hora, nivel, intentos } = req.body;
 
-app.get('/islas_progreso', async (req, res) => {
+  if (!jugador || !nivel || !intentos) {
+    return res.status(400).json({ error: "Faltan campos obligatorios (jugador, nivel, intentos)." });
+  }
+
+  let connection;
+  try {
+    connection = await db.connect();
+
+    // Validar que el jugador existe
+    const [jugadorRows] = await connection.execute(
+      'SELECT id_jugador FROM jugador WHERE id_jugador = ?',
+      [jugador]
+    );
+
+    if (jugadorRows.length === 0) {
+      return res.status(400).json({ error: `El jugador ${jugador} no existe.` });
+    }
+
+
+    // Guardar partida (siempre crea una nueva fila con id_partida AUTO_INCREMENT)
+    const partidaResult = await db.savePartida(connection, {
+      jugador,
+      score_max,
+      tiempo_seg,
+      fecha_hora,
+      nivel
+    });
+
+    const id_partida = partidaResult.insertId;
+
+    // Guardar intentos asociados a la partida recién creada
+    for (const intento of intentos) {
+      await db.saveIntentoPregunta(connection, {
+        id_partida,
+        id_pregunta: intento.id_pregunta,
+        respuesta_usuario: intento.respuesta_usuario,
+        es_correcto: intento.es_correcto,
+        tiempo_respuesta_seg: intento.tiempo_respuesta_seg
+      });
+    }
+
+    await db.saveProgreso(connection, {
+      id_jugador: jugador,
+      id_nivel: nivel,
+      id_partida
+    });
+
+    return res.status(201).json({ message: 'Progreso guardado correctamente', id_partida });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+});app.get('/islas_progreso', async (req, res) => {
   let connection;
   let host = `https://${req.hostname}`;
 
