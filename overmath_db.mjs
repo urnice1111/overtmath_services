@@ -439,12 +439,12 @@ async function getGeneralInfo(connection){
     const tiempoTotal = Number((rowsTiempoTotal[0].tiempo_total_jugado/60/60).toFixed(2) ?? 0);
     const nivelesCompletados = Number(rowsNivelesCompletados[0].niveles_completados ?? 0);
 
-    return {
-        jugadoresActivos: jugadoresActivos,
-        partidasTotales: partidasTotales,
-        tiempoTotal: tiempoTotal,
-        nivelesCompletados: nivelesCompletados
-    }
+    return [
+        {key: "jugadores_activos", stat_number: jugadoresActivos, stat_label: "Jugadores Activos"},
+        {key: "partidas_totales", stat_number: partidasTotales, stat_label: "Partidas Jugadas"},
+        {key: "tiempo_total", stat_number: tiempoTotal, stat_label: "Tiempo Jugado"},
+        {key: "nivelesCompletados", stat_number: nivelesCompletados, stat_label: "Niveles completados"}
+    ]
 }
 
 export default {

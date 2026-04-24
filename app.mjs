@@ -410,7 +410,9 @@ app.get('/general_info', async (req, res) => {
     connection = await db.connect();
     const result = await db.getGeneralInfo(connection);
 
-    return res.json({result});
+    await new Promise(r => setTimeout(r, 3000));
+
+    return res.json(result);
   } catch (err){
     return res.status(500).json(err);
   } finally{
