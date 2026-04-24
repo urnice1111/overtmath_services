@@ -390,7 +390,6 @@ app.get('/islas_progreso', async (req, res) => {
     connection = await db.connect();
     const result = await db.getIslasProgreso(connection);
 
-    await new Promise(r => setTimeout(r, 3000));  // 3 second delay
 
     return res.json(result);
   }catch(err){
@@ -410,7 +409,6 @@ app.get('/general_info', async (req, res) => {
     connection = await db.connect();
     const result = await db.getGeneralInfo(connection);
 
-    await new Promise(r => setTimeout(r, 3000));
 
     return res.json(result);
   } catch (err){
