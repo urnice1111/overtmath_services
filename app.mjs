@@ -450,6 +450,24 @@ app.get('/general_info', async (req, res) => {
   }
 });
 
+app.get('/jugadores_alerta', async (req, res) => {
+  let connection;
+  let host = `https://${req.hostname}`;
+  try{
+    connection = await db.connect();
+    const result = await db.getAlertStudents(connection);
+
+    return res.json(result);
+  } catch (err){
+    return res.status(500).json(err);
+
+  } finally{
+    if (connection){
+      await connection.end();
+    }
+  }
+});
+
 
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
   app.listen(port, () => {
