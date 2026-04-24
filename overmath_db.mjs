@@ -14,10 +14,6 @@ async function connect() {
     connectionLimit: 10,
     queueLimit: 0
   });
-//}
-
-async function connect() {
-  return pool.getConnection(); // este sí tiene .release()
 }
 
 async function register(connection, host, email, password) {
@@ -403,8 +399,56 @@ async function saveProgreso(connection, { id_jugador, id_nivel, id_partida }) {
   return result;
 }
 
+async function getGeneralInfo(connection){
+    const queryJugadoresActivos = `
+      SELECT COUNT(DISTINCT j.id_jugador) AS jugadores_activos
+      FROM jugador j
+      JOIN cuenta c ON j.cuenta = c.id_cuenta
+      JOIN historial_login hl ON hl.cuenta = c.id_cuenta
+      WHERE hl.fecha_hora >= NOW() - INTERVAL 7 DAY
+        AND hl.exito = 1;
+    `;
+
+    const queryPartidasTotales = `
+      SELECT COUNT(id_partida) AS partidas_totales
+      FROM partida
+      WHERE fecha_hora >= NOW() - INTERVAL 7 DAY;
+    `;
+
+    const queryTiempoTotal = `
+      SELECT COALESCE(SUM(tiempo_seg), 0) AS tiempo_total_jugado
+      FROM partida
+      WHERE fecha_hora >= NOW() - INTERVAL 15 DAY;
+    `;
+
+    const queryNivelesCompletados = `
+      SELECT COUNT(*) AS niveles_completados
+      FROM partida p
+      JOIN nivel n ON p.nivel = n.id_nivel
+      WHERE p.score_max >= n.puntaje_aceptable
+        AND p.fecha_hora >= NOW() - INTERVAL 7 DAY;
+    `;
+
+    const [rowsJugadoresActivos] = await connection.execute(queryJugadoresActivos);
+    const [rowsPartidasTotales] = await connection.execute(queryPartidasTotales);
+    const [rowsTiempoTotal] = await connection.execute(queryTiempoTotal);
+    const [rowsNivelesCompletados] = await connection.execute(queryNivelesCompletados);
+
+    const jugadoresActivos = Number(rowsJugadoresActivos[0].jugadores_activos ?? 0);
+    const partidasTotales = Number(rowsPartidasTotales[0].partidas_totales ?? 0);
+    const tiempoTotal = Number((rowsTiempoTotal[0].tiempo_total_jugado/60/60).toFixed(2) ?? 0);
+    const nivelesCompletados = Number(rowsNivelesCompletados[0].niveles_completados ?? 0);
+
+    return {
+        jugadoresActivos: jugadoresActivos,
+        partidasTotales: partidasTotales,
+        tiempoTotal: tiempoTotal,
+        nivelesCompletados: nivelesCompletados
+    }
+}
+
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
-  register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso
+  register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo
 };

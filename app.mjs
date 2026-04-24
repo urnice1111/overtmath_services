@@ -10,6 +10,9 @@ const ipAddress = process.env.C9_HOSTNAME ?? 'localhost';
 app.use(cors())
 app.use(express.json());
 
+
+
+
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
   let connection;
@@ -376,10 +379,12 @@ app.post('/save_progress', async (req, res) => {
   } finally {
     if (connection) connection.release();
   }
-  
-});app.get('/islas_progreso', async (req, res) => {
+
+});
+
+app.get('/islas_progreso', async (req, res) => {
   let connection;
-  let host = `https://${req.hostname}`;
+  
 
   try{
     connection = await db.connect();
@@ -392,6 +397,23 @@ app.post('/save_progress', async (req, res) => {
       const {name, message} = err;
       res.status(500).json({name, message});
   } finally {
+    if (connection){
+      await connection.end();
+    }
+  }
+});
+
+app.get('/general_info', async (req, res) => {
+  let connection;
+  let host = `https://${req.hostname}`;
+  try{
+    connection = await db.connect();
+    const result = await db.getGeneralInfo(connection);
+
+    return res.json({result});
+  } catch (err){
+    return res.status(500).json(err);
+  } finally{
     if (connection){
       await connection.end();
     }
