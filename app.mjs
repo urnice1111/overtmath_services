@@ -119,7 +119,7 @@ app.put('/solicitud_vinculacion/:id/resolver', async (req, res) => {
   } finally {
     if (connection) connection.release()
   }
-})
+});
 
 app.get('/get_questions/:island/:difficulty', async (req, res) => {
     const { island, difficulty } = req.params;

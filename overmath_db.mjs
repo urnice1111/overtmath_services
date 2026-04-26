@@ -113,8 +113,7 @@ async function getSolicitudesVinculacion(connection) {
 
     return { solicitudes: rows };
 }
-
-async function resolverSolicitudVinculacion(connection, id_solicitud, estado, motivo_rechazo, id_admin) {
+async function resolverSolicitudVinculacion(connection, id_solicitud, estado, motivo_rechazo, id_cuenta_admin) {
     const [rows] = await connection.execute(
         'SELECT id_solicitud, id_tutor, id_jugador, parentezco, estado FROM solicitud_vinculacion WHERE id_solicitud = ?',
         [id_solicitud]
@@ -134,9 +133,22 @@ async function resolverSolicitudVinculacion(connection, id_solicitud, estado, mo
         throw err;
     }
 
+    const [adminRows] = await connection.execute(
+        'SELECT id_administrador FROM administrador WHERE cuenta = ?',
+        [id_cuenta_admin]
+    );
+
+    if (adminRows.length === 0) {
+        const err = new Error('Administrador no encontrado.');
+        err.status = 403;
+        throw err;
+    }
+
+    const id_administrador = adminRows[0].id_administrador;
+
     await connection.execute(
         'UPDATE solicitud_vinculacion SET estado = ?, motivo_rechazo = ?, fecha_resolucion = NOW(), id_admin = ? WHERE id_solicitud = ?',
-        [estado, motivo_rechazo || null, id_admin || null, id_solicitud]
+        [estado, motivo_rechazo || null, id_administrador, id_solicitud]
     );
 
     if (estado === 'aceptada') {
