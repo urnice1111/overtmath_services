@@ -276,6 +276,27 @@ app.post('/login', async (req, res) => {
 });
 
 
+app.get('/get_player_progress/:id_jugador', async (req, res) => {
+    let connection;
+
+    try {
+        connection = await db.connect();
+        const { id_jugador } = req.params;
+
+        const result = await db.getPlayerProgress(connection, id_jugador);
+
+        return res.json(result);
+    } catch (error) {
+        console.error(error);
+        return res.status(error.status || 500).json({
+            error: error.message || 'Error al obtener el progreso del jugador'
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
+    }
+});
 
 app.post('/register_jugador', async (req, res) => {
   const { email, username, password, name, last_name, date } = req.body;
@@ -306,6 +327,21 @@ app.post('/register_jugador', async (req, res) => {
   }
 });
 
+
+app.post(`/set_tutorial_completed`, async (req, res)=>{
+  const {id_user} = req.body;
+  let connection;
+  try {
+    connection = await db.connect();
+    const result = db.setTutorialCompletado(connection, id_user);
+    return res.json(result)
+  } catch (err){
+    return res.status(500).json(err)
+  } finally {
+    if (connection)
+      await connection.release();
+  }
+});
 
 app.post('/register_tutor', async (req, res) => {
   const { email, password, name, last_name, number } = req.body;

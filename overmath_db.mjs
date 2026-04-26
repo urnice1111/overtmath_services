@@ -874,10 +874,140 @@ async function getReportesAnaliticos(connection) {
     };
 }
 
+async function getPlayerProgress(connection, id_jugador) {
+    const sqlJugador = `
+        SELECT tutorial_completado
+        FROM jugador
+        WHERE cuenta = ?;
+    `;
+
+    const sqlIslasSuperadas = `
+        SELECT
+            i.nombre AS isla_id,
+            COALESCE(
+                MAX(
+                    CASE
+                        WHEN p.score_max >= n.puntaje_aceptable THEN 1
+                        ELSE 0
+                    END
+                ),
+                0
+            ) AS isla_superada
+        FROM isla i
+        LEFT JOIN nivel n
+            ON n.isla = i.id_isla
+        LEFT JOIN partida p
+            ON p.nivel = n.id_nivel
+           AND p.jugador = ?
+        WHERE i.nombre IN (
+            'isla_suma',
+            'isla_resta',
+            'isla_multi',
+            'isla_div',
+            'isla_comb'
+        )
+        GROUP BY i.nombre;
+    `;
+
+    const [jugadorRows] = await connection.execute(sqlJugador, [id_jugador]);
+
+    if (jugadorRows.length === 0) {
+        const err = new Error('Jugador no encontrado.');
+        err.status = 404;
+        throw err;
+    }
+
+    const tutorial_completado = Boolean(jugadorRows[0].tutorial_completado);
+
+    const [islasRows] = await connection.execute(sqlIslasSuperadas, [id_jugador]);
+
+    const superadas = {
+        isla_suma: false,
+        isla_resta: false,
+        isla_multi: false,
+        isla_div: false,
+        isla_comb: false,
+    };
+
+    for (const row of islasRows) {
+        superadas[row.isla_id] = Boolean(row.isla_superada);
+    }
+
+    let desbloqueadas;
+
+    if (!tutorial_completado) {
+        desbloqueadas = {
+            isla_suma: false,
+            isla_resta: false,
+            isla_multi: false,
+            isla_div: false,
+            isla_comb: false,
+        };
+    } else {
+        desbloqueadas = {
+            isla_suma: true,
+            isla_resta: superadas.isla_suma,
+            isla_multi: superadas.isla_resta,
+            isla_div: superadas.isla_multi,
+            isla_comb: superadas.isla_div,
+            isla_infinito: superadas.isla_comb
+        };
+    }
+
+    return {
+        tutorial_completado,
+        islas: [
+            {
+                isla_id: "isla_suma",
+                desbloqueada: desbloqueadas.isla_suma
+            },
+            {
+                isla_id: "isla_resta",
+                desbloqueada: desbloqueadas.isla_resta
+            },
+            {
+                isla_id: "isla_multi",
+                desbloqueada: desbloqueadas.isla_multi
+            },
+            {
+                isla_id: "isla_div",
+                desbloqueada: desbloqueadas.isla_div
+            },
+            {
+                isla_id: "isla_comb",
+                desbloqueada: desbloqueadas.isla_comb
+            }
+        ]
+    };
+}
+
+
 async function getPlayerSkins(connection, id_jugador){
     const sqlQuery = `SELECT nombre_asset, descripcion FROM jugador_personaje jp JOIN personaje p ON jp.id_personaje=p.id_personaje  WHERE id_jugador = ?;`
     const [skins] = await connection.execute(sqlQuery, [id_jugador]);
     return skins;
+}
+
+async function setTutorialCompletado(connection, id_cuenta) {
+    const sqlQuery = `
+        UPDATE jugador
+        SET tutorial_completado = TRUE
+        WHERE cuenta = ?;
+    `;
+
+    const [result] = await connection.execute(sqlQuery, [id_cuenta]);
+
+    if (result.affectedRows === 0) {
+        const err = new Error('No se encontró un jugador asociado a esa cuenta.');
+        err.status = 404;
+        throw err;
+    }
+
+    return {
+        ok: true,
+        message: 'Tutorial marcado como completado.',
+        affectedRows: result.affectedRows
+    };
 }
 
 export default {
@@ -885,5 +1015,5 @@ export default {
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
   register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo,
   getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta,
-  getReportesAnaliticos, getPlayerSkins
+  getReportesAnaliticos, getPlayerSkins, getPlayerProgress, setTutorialCompletado
 };
