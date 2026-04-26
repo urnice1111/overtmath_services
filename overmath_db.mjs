@@ -778,9 +778,92 @@ async function activarCuenta(connection, cuenta, condicion){
     }
 }
 
+async function getReportesAnaliticos(connection) {
+    const [precisionPorIsla] = await connection.execute(`
+        SELECT
+            i.id_isla,
+            i.nombre AS isla,
+            COUNT(*) AS total_intentos,
+            SUM(CASE WHEN ip.es_correcto = 1 THEN 1 ELSE 0 END) AS correctos,
+            ROUND(
+                100.0 * SUM(CASE WHEN ip.es_correcto = 1 THEN 1 ELSE 0 END) / COUNT(*),
+                2
+            ) AS precision_porcentaje
+        FROM intento_pregunta ip
+        JOIN partida p ON ip.id_partida = p.id_partida
+        JOIN nivel n ON p.nivel = n.id_nivel
+        JOIN isla i ON n.isla = i.id_isla
+        GROUP BY i.id_isla, i.nombre
+        ORDER BY precision_porcentaje DESC
+    `);
+
+    const [erroresPorIsla] = await connection.execute(`
+        SELECT
+            i.id_isla,
+            i.nombre AS isla,
+            COUNT(*) AS total_intentos,
+            SUM(CASE WHEN ip.es_correcto = 0 THEN 1 ELSE 0 END) AS incorrectos,
+            ROUND(
+                100.0 * SUM(CASE WHEN ip.es_correcto = 0 THEN 1 ELSE 0 END) / COUNT(*),
+                2
+            ) AS error_porcentaje
+        FROM intento_pregunta ip
+        JOIN partida p ON ip.id_partida = p.id_partida
+        JOIN nivel n ON p.nivel = n.id_nivel
+        JOIN isla i ON n.isla = i.id_isla
+        GROUP BY i.id_isla, i.nombre
+        ORDER BY error_porcentaje DESC
+    `);
+
+    const [preguntasDificiles] = await connection.execute(`
+        SELECT
+            pr.id_pregunta,
+            pr.problema,
+            pr.tema,
+            i.nombre AS isla,
+            COUNT(*) AS total_intentos,
+            SUM(CASE WHEN ip.es_correcto = 0 THEN 1 ELSE 0 END) AS total_errores,
+            ROUND(
+                100.0 * SUM(CASE WHEN ip.es_correcto = 0 THEN 1 ELSE 0 END) / COUNT(*),
+                2
+            ) AS porcentaje_error
+        FROM intento_pregunta ip
+        JOIN pregunta pr ON ip.id_pregunta = pr.id_pregunta
+        JOIN nivel n ON pr.nivel = n.id_nivel
+        JOIN isla i ON n.isla = i.id_isla
+        GROUP BY pr.id_pregunta, pr.problema, pr.tema, i.nombre
+        HAVING COUNT(*) >= 3
+        ORDER BY porcentaje_error DESC, total_errores DESC
+        LIMIT 10
+    `);
+
+    const [precisionPorTema] = await connection.execute(`
+        SELECT
+            pr.tema,
+            COUNT(*) AS total_intentos,
+            SUM(CASE WHEN ip.es_correcto = 1 THEN 1 ELSE 0 END) AS correctos,
+            ROUND(
+                100.0 * SUM(CASE WHEN ip.es_correcto = 1 THEN 1 ELSE 0 END) / COUNT(*),
+                2
+            ) AS precision_porcentaje
+        FROM intento_pregunta ip
+        JOIN pregunta pr ON ip.id_pregunta = pr.id_pregunta
+        GROUP BY pr.tema
+        ORDER BY precision_porcentaje DESC
+    `);
+
+    return {
+        precisionPorIsla,
+        erroresPorIsla,
+        preguntasDificiles,
+        precisionPorTema
+    };
+}
+
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
   register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo,
-  getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta
+  getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta,
+  getReportesAnaliticos
 };

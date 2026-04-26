@@ -520,7 +520,19 @@ app.put('/activar_rechazar_cuenta', async (req, res)=>{
 
 });
 
-
+app.get('/reportes_analiticos', async (req, res) => {
+  let connection;
+  try {
+    connection = await db.connect();
+    const result = await db.getReportesAnaliticos(connection);
+    return res.json(result);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+});
 
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
   app.listen(port, () => {
