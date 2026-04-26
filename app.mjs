@@ -51,7 +51,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// --- Solicitudes de vinculación tutor ↔ jugador ---
+//Vinvulación con tutor y el jugador
 
 app.post('/solicitud_vinculacion', async (req, res) => {
   const { id_cuenta, id_jugador, parentezco } = req.body
