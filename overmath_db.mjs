@@ -266,10 +266,10 @@ async function setLoginUser(connection, host, userId, deviceType){
 */
 async function login(connection, host, email, password, deviceType) {
     const sqlQuery = `
-        SELECT id_cuenta, correo, contrasena_hash
-        FROM cuenta
-        WHERE correo = ?
-    `;
+        SELECT id_cuenta, correo, contrasena_hash, skin_actual, id_jugador, monedas, score_global 
+        FROM cuenta c 
+        JOIN jugador j ON c.id_cuenta = j.cuenta 
+        WHERE correo = ?`;
 
     try {
         const [rows] = await connection.execute(sqlQuery, [email]);
@@ -287,12 +287,19 @@ async function login(connection, host, email, password, deviceType) {
 
         await setLoginUser(connection, host, user.id_cuenta, deviceType);
 
+        const skins = await getPlayerSkins(connection, user.id_jugador);
+
+
         return {
             ok: true,
             user: {
                 id_cuenta: user.id_cuenta,
-                correo: user.correo
-            }
+                correo: user.correo,
+                skin_actual: user.skin_actual,
+                monedas: user.monedas,
+                score_global: user.score_global
+            },
+            skins: skins
         };
 
     } catch (error) {
@@ -318,7 +325,7 @@ async function register_admin(connection, email, password, name, last_name) {
 
 async function loginTutorAdmin(connection, email, password, deviceType, rol) {
     const sqlQuery = `
-        SELECT id_cuenta, correo, contrasena_hash, rol
+        SELECT id_cuenta, correo, contrasena_hash, rol, activo
         FROM cuenta
         WHERE correo = ?
     `;
@@ -338,6 +345,10 @@ async function loginTutorAdmin(connection, email, password, deviceType, rol) {
 
     if (user.rol !== rol) {
         return { ok: false, status: 403, error: `Esta cuenta no tiene el rol de ${rol}.` };
+    }
+
+    if (user.activo == 0){
+        return {ok: false, status: 403, error: `Esta cuenta no ha sido aceptada. Un admistrador debe aceptarte primero.`};
     }
 
     await setLoginUser(connection, null, user.id_cuenta, deviceType);
@@ -760,7 +771,10 @@ async function getTutorDashboard(connection, idCuenta) {
 
 
 async function getInactivePlayers(connection){
-    const sqlQuery = `SELECT id_cuenta, correo, rol, fecha_creacion FROM cuenta WHERE rol = 'jugador' AND activo = 0;`
+    const sqlQuery = `SELECT id_cuenta, correo, rol, fecha_creacion
+                        FROM cuenta
+                        WHERE (rol = 'jugador')
+                        AND activo = 0;`
     const [cuentas] = await connection.execute(sqlQuery);
     return cuentas;
 }
@@ -860,10 +874,16 @@ async function getReportesAnaliticos(connection) {
     };
 }
 
+async function getPlayerSkins(connection, id_jugador){
+    const sqlQuery = `SELECT nombre_asset, descripcion FROM jugador_personaje jp JOIN personaje p ON jp.id_personaje=p.id_personaje  WHERE id_jugador = ?;`
+    const [skins] = await connection.execute(sqlQuery, [id_jugador]);
+    return skins;
+}
+
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
   register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo,
   getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta,
-  getReportesAnaliticos
+  getReportesAnaliticos, getPlayerSkins
 };

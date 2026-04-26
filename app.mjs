@@ -534,6 +534,24 @@ app.get('/reportes_analiticos', async (req, res) => {
   }
 });
 
+
+app.get('/player_skins/:id_jugador', async (req, res)=>{
+  const {id_jugador} = req.params;
+
+  let connection;
+  try{
+    connection = await db.connect();
+    const result = await db.getPlayerSkins(connection, id_jugador);
+    return res.json(result);
+  } catch (err){
+    return res.status(500).json(err);
+  } finally {
+    if (connection)
+      connection.release();
+  }
+});
+
+
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
   app.listen(port, () => {
     console.log(
