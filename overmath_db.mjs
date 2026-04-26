@@ -3,17 +3,19 @@ import bcrypt from 'bcrypt'
 import 'dotenv/config';
 
 
-async function connect() {
-  return await mysql.createConnection({
+const pool = mysql.createPool({
     host: process.env.MYSQL_HOST,
-    port: process.env.MYSQL_PORT,                                                // puerto por defecto
-    user: process.env.MYSQL_USER,                                             // tu usuario
-    password: process.env.MYSQL_PASSWORD,                              // tu contraseña
-    database: process.env.MYSQL_DB_NAME,                                     // nombre de la base
+    port: process.env.MYSQL_PORT,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
-  });
+});
+
+async function connect() {
+    return await pool.getConnection();
 }
 
 async function register(connection, host, email, password) {
@@ -744,9 +746,29 @@ async function getTutorDashboard(connection, idCuenta) {
     };
 }
 
+
+async function getInactivePlayers(connection){
+    const sqlQuery = `SELECT id_cuenta, correo, rol, fecha_creacion FROM cuenta WHERE rol = 'jugador' AND activo = 0;`
+    const [cuentas] = await connection.execute(sqlQuery);
+    return cuentas;
+}
+
+async function activarCuenta(connection, cuenta, condicion){
+    const sqlQueryAceptar = `UPDATE cuenta SET activo=true WHERE id_cuenta=?`
+    const sqlQueryRechazar = `DELETE FROM cuenta WHERE id_cuenta = ?`
+
+    if (condicion == 'aceptar'){
+            connection.execute(sqlQueryAceptar, [cuenta]);
+            return {message: "cuenta aceptada"}
+    } else{
+        connection.execute(sqlQueryRechazar, [cuenta]);
+        return {message: "cuenta rechazada y borrada"}
+    }
+}
+
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
   register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo,
-  getTutorDashboard, getAlertStudents, getAllPlayers
+  getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta
 };

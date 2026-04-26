@@ -46,7 +46,7 @@ app.post('/register', async (req, res) => {
 
   } finally {
     if (connection) {
-      await connection.end();
+      await connection.release();
     }
   }
 });
@@ -136,7 +136,7 @@ app.get('/get_questions/:island/:difficulty', async (req, res) => {
         res.status(500).json({name, message});
     } finally {
       if (connection){
-        await connection.end();
+        await connection.release();
       }
     }
 });
@@ -157,7 +157,7 @@ app.get('/get_scoreboard', async (req, res) => {
       res.status(500).json({name, message});
   } finally {
     if (connection){
-      await connection.end();
+      await connection.release();
     }
   }
 });
@@ -180,7 +180,7 @@ const handleTutorDashboard = async (req, res) => {
   } finally {
     if (connection) {
       if (typeof connection.release === 'function') connection.release()
-      else if (typeof connection.end === 'function') await connection.end()
+      else if (typeof connection.end === 'function') await connection.release()
     }
   }
 }
@@ -427,7 +427,7 @@ app.get('/islas_progreso', async (req, res) => {
       res.status(500).json({name, message});
   } finally {
     if (connection){
-      await connection.end();
+      await connection.release();
     }
   }
 });
@@ -445,7 +445,7 @@ app.get('/general_info', async (req, res) => {
     return res.status(500).json(err);
   } finally{
     if (connection){
-      await connection.end();
+      await connection.release();
     }
   }
 });
@@ -463,7 +463,7 @@ app.get('/jugadores_alerta', async (req, res) => {
 
   } finally{
     if (connection){
-      await connection.end();
+      await connection.release();
     }
   }
 });
@@ -482,9 +482,44 @@ app.get('/all_players', async (req, res)=>{
     return res.status(500).json(err);
   } finally{
     if (connection)
-      await connection.end();
+      await connection.release();
   }
 });
+
+app.get('/cuentas_inactivas', async (req, res) => {
+  let connection;
+  let host = `https://${req.hostname}`;
+
+  try {
+    connection = await db.connect();
+    const result = await db.getInactivePlayers(connection);
+    return res.json(result);
+  } catch (err){
+    return res.status(500).json(err);
+  } finally{
+    if (connection)
+      await connection.release();
+  }
+});
+
+app.put('/activar_rechazar_cuenta', async (req, res)=>{
+ const {id_cuenta, accion} = req.body;
+ let connection;
+ let host = `https://${req.hostname}`;
+
+ try{
+  connection = await db.connect();
+  const result = await db.activarCuenta(connection, id_cuenta, accion);
+  return res.json(result)
+ } catch(err){
+  return res.status(500).json(err);
+ } finally{
+  if (connection)
+    await connection.release();
+ }
+
+});
+
 
 
 if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
