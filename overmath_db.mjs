@@ -514,7 +514,98 @@ async function getAlertStudents(connection){
 }
 
 
+async function getAllPlayers(connection){
+    const sqlQuery=`SELECT
+                        j.id_jugador,
+                        j.primer_nombre,
+                        j.apellidos,
+                        j.score_global,
 
+                        TIMESTAMPDIFF(DAY, ps.ultima_actividad, NOW()) AS ultima_actividad,
+
+                        ROUND(COALESCE(ws.tiempo_semanal_horas, 0), 2) AS tiempo_semanal_horas,
+                        ROUND(COALESCE(pr.precision_general, 0), 2) AS precision_general,
+
+                        CASE
+                            WHEN COALESCE(st.atascado, 0) = 1 THEN 'atascado'
+                            WHEN ps.ultima_actividad IS NULL THEN 'inactivo'
+                            WHEN ps.ultima_actividad < NOW() - INTERVAL 30 DAY THEN 'inactivo'
+                            WHEN ps.ultima_actividad < NOW() - INTERVAL 7 DAY THEN 'baja_participacion'
+                            ELSE 'activo'
+                        END AS estado
+
+                    FROM jugador j
+
+                    LEFT JOIN (
+                        SELECT
+                            p.jugador,
+                            MAX(p.fecha_hora) AS ultima_actividad
+                        FROM partida p
+                        GROUP BY p.jugador
+                    ) AS ps
+                        ON ps.jugador = j.id_jugador
+
+                    LEFT JOIN (
+                        SELECT
+                            p.jugador,
+                            SUM(p.tiempo_seg) / 3600 AS tiempo_semanal_horas
+                        FROM partida p
+                        WHERE p.fecha_hora >= NOW() - INTERVAL 7 DAY
+                        GROUP BY p.jugador
+                    ) AS ws
+                        ON ws.jugador = j.id_jugador
+
+                    LEFT JOIN (
+                        SELECT
+                            p.jugador,
+                            100.0 * SUM(CASE WHEN ip.es_correcto = 1 THEN 1 ELSE 0 END) / COUNT(*) AS precision_general
+                        FROM partida p
+                        JOIN intento_pregunta ip
+                            ON ip.id_partida = p.id_partida
+                        GROUP BY p.jugador
+                    ) AS pr
+                        ON pr.jugador = j.id_jugador
+
+                    LEFT JOIN (
+                        SELECT
+                            t.jugador,
+                            1 AS atascado
+                        FROM (
+                            SELECT
+                                p.jugador,
+                                p.nivel
+                            FROM partida p
+                            JOIN nivel n
+                                ON n.id_nivel = p.nivel
+                            WHERE p.fecha_hora >= NOW() - INTERVAL 14 DAY
+                            GROUP BY p.jugador, p.nivel
+                            HAVING COUNT(*) >= 3
+                            AND SUM(
+                                CASE
+                                    WHEN p.score_max >= n.puntaje_aceptable THEN 1
+                                    ELSE 0
+                                END
+                            ) = 0
+                        ) AS t
+                        GROUP BY t.jugador
+                    ) AS st
+                        ON st.jugador = j.id_jugador
+
+                    ORDER BY
+                        CASE
+                            WHEN COALESCE(st.atascado, 0) = 1 THEN 1
+                            WHEN ps.ultima_actividad IS NULL THEN 2
+                            WHEN ps.ultima_actividad < NOW() - INTERVAL 30 DAY THEN 2
+                            WHEN ps.ultima_actividad < NOW() - INTERVAL 7 DAY THEN 3
+                            ELSE 4
+                        END,
+                        j.score_global DESC,
+                        j.primer_nombre ASC;`
+    const [players] = await connection.execute(sqlQuery);
+
+    return players;
+
+}
 
 async function getTutorDashboard(connection, idCuenta) {
     const sqlTutor = `SELECT id_tutor, primer_nombre, apellidos
@@ -657,5 +748,5 @@ export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
   register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo,
-  getTutorDashboard, getAlertStudents
+  getTutorDashboard, getAlertStudents, getAllPlayers
 };
