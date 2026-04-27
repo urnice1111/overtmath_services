@@ -389,9 +389,9 @@ app.post('/register_tutor', async (req, res) => {
 // });
 
 app.post('/save_progress', async (req, res) => {
-  const { jugador, score_max, tiempo_seg, fecha_hora, nivel, intentos } = req.body;
+  const { id_cuenta, score_max, tiempo_seg, nombreIsla, dificultad, intentos } = req.body;
 
-  if (!jugador || !nivel || !intentos) {
+  if (!id_cuenta || !intentos) {
     return res.status(400).json({ error: "Faltan campos obligatorios (jugador, nivel, intentos)." });
   }
 
@@ -399,24 +399,42 @@ app.post('/save_progress', async (req, res) => {
   try {
     connection = await db.connect();
 
-    // Validar que el jugador existe
-    const [jugadorRows] = await connection.execute(
-      'SELECT id_jugador FROM jugador WHERE id_jugador = ?',
-      [jugador]
-    );
+    const [playerIdRow] = await connection.execute(`SELECT id_jugador FROM jugador WHERE cuenta=?`, [id_cuenta]);
 
-    if (jugadorRows.length === 0) {
-      return res.status(400).json({ error: `El jugador ${jugador} no existe.` });
+    if (playerIdRow.length === 0) {
+      return res.status(400).json({ error: `El jugador con cuenta ${id_cuenta} no existe.` });
     }
+
+    const playerId = playerIdRow[0].id_jugador;
+
+    // Get nivel_id
+
+    const [currentScoreRow] = await connection.execute(`SELECT score_global FROM jugador WHERE id_jugador = ?`, [playerId]);
+
+    const newScore =  currentScoreRow[0].score_global + score_max;
+
+    const [monedasRow] = await connection.execute(`SELECT monedas FROM jugador WHERE id_jugador = ?`, [playerId]);
+
+    const newMonedas = monedasRow[0].monedas + score_max / 10;
+
+
+    const [resultUpdateRow] = await connection.execute(`UPDATE jugador SET monedas=?, score_global=? WHERE id_jugador=?`, [newMonedas, newScore, playerId]);
+    
+
+    const [nivelIdRow] = await connection.execute(`
+                        SELECT id_nivel 
+                        FROM nivel n JOIN isla i ON n.isla=i.id_isla 
+                        WHERE i.nombre=? AND n.dificultad=?;`, [nombreIsla, dificultad])
+
+    const nivelId = nivelIdRow[0].id_nivel;
 
 
     // Guardar partida (siempre crea una nueva fila con id_partida AUTO_INCREMENT)
     const partidaResult = await db.savePartida(connection, {
-      jugador,
+      id_jugador: playerId, 
       score_max,
       tiempo_seg,
-      fecha_hora,
-      nivel
+      nivelId
     });
 
     const id_partida = partidaResult.insertId;
@@ -432,13 +450,8 @@ app.post('/save_progress', async (req, res) => {
       });
     }
 
-    await db.saveProgreso(connection, {
-      id_jugador: jugador,
-      id_nivel: nivel,
-      id_partida
-    });
-
     return res.status(201).json({ message: 'Progreso guardado correctamente', id_partida });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: err.message });
@@ -448,13 +461,15 @@ app.post('/save_progress', async (req, res) => {
 
 });
 
-app.get('/islas_progreso', async (req, res) => {
+app.get('/islas_progreso/:id_cuenta', async (req, res) => {
+
+  const {id_cuenta} = req.params;
   let connection;
   
 
   try{
     connection = await db.connect();
-    const result = await db.getIslasProgreso(connection);
+    const result = await db.getIslasProgreso(connection, id_cuenta);
 
 
     return res.json(result);

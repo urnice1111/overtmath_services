@@ -363,11 +363,11 @@ async function loginTutorAdmin(connection, email, password, deviceType, rol) {
 }
 
 // Función para guardar partida
-async function savePartida(connection, { jugador, score_max, tiempo_seg, fecha_hora, nivel }) {
+async function savePartida(connection, { id_jugador, score_max, tiempo_seg, nivelId }) {
   const [result] = await connection.execute(
-    `INSERT INTO partida (score_max, fecha_hora, tiempo_seg, nivel, jugador)
-     VALUES (?, ?, ?, ?, ?)`,
-    [score_max, fecha_hora, tiempo_seg, nivel, jugador]
+    `INSERT INTO partida (score_max, tiempo_seg, nivel, jugador)
+     VALUES (?, ?, ?, ?)`,
+    [score_max, tiempo_seg, nivelId, id_jugador]
   );
   return result;
 }
@@ -384,45 +384,96 @@ async function saveIntentoPregunta(connection, { id_partida, id_pregunta, respue
 }
 
 
-async function getIslasProgreso(connection){
-    const sqlQuery = `SELECT
-                        j.id_jugador,
-                        j.primer_nombre AS estudiante,
-                        COALESCE(MAX(i.nombre = 'isla_suma'), 0)            AS isla_suma,
-                        COALESCE(MAX(i.nombre = 'isla_resta'), 0)           AS isla_resta,
-                        COALESCE(MAX(i.nombre = 'isla_multiplicacion'), 0)  AS isla_multiplicacion,
-                        COALESCE(MAX(i.nombre = 'isla_division'), 0)        AS isla_division,
-                        COALESCE(MAX(i.nombre = 'isla_todos'), 0)           AS isla_todos
-                        FROM jugador j
-                        LEFT JOIN partida p ON p.jugador = j.id_jugador
-                        LEFT JOIN nivel   n ON n.id_nivel = p.nivel
-                        LEFT JOIN isla    i ON i.id_isla  = n.isla
-                        GROUP BY j.id_jugador, j.primer_nombre;`
-    const [rows] =  await connection.execute(sqlQuery);
+async function getIslasProgreso(connection, id_cuenta) {
+    const sqlQuery = `
+        SELECT
+            j.id_jugador,
+            j.primer_nombre AS estudiante,
+            j.tutorial_completado,
 
-    const  a = rows.map(row => ({
-        estudiante: row.estudiante,
-        islas: {
-            isla_suma: row.isla_suma ? true: false,
-            isla_resta: row.isla_resta ? true: false,
-            isla_multiplicacion: row.isla_multiplicacion ? true: false,
-            isla_division: row.isla_division ? true: false,
-            isla_todos: row.isla_todos ? true: false
+            COALESCE(MAX(
+                CASE
+                    WHEN i.nombre = 'isla_suma'
+                     AND p.score_max >= n.puntaje_aceptable
+                    THEN 1 ELSE 0
+                END
+            ), 0) AS supero_isla_suma,
+
+            COALESCE(MAX(
+                CASE
+                    WHEN i.nombre = 'isla_resta'
+                     AND p.score_max >= n.puntaje_aceptable
+                    THEN 1 ELSE 0
+                END
+            ), 0) AS supero_isla_resta,
+
+            COALESCE(MAX(
+                CASE
+                    WHEN i.nombre = 'isla_multiplicacion'
+                     AND p.score_max >= n.puntaje_aceptable
+                    THEN 1 ELSE 0
+                END
+            ), 0) AS supero_isla_multiplicacion,
+
+            COALESCE(MAX(
+                CASE
+                    WHEN i.nombre = 'isla_division'
+                     AND p.score_max >= n.puntaje_aceptable
+                    THEN 1 ELSE 0
+                END
+            ), 0) AS supero_isla_division,
+
+            COALESCE(MAX(
+                CASE
+                    WHEN i.nombre = 'isla_todos'
+                     AND p.score_max >= n.puntaje_aceptable
+                    THEN 1 ELSE 0
+                END
+            ), 0) AS supero_isla_todos
+
+        FROM jugador j
+        LEFT JOIN partida p ON p.jugador = j.id_jugador
+        LEFT JOIN nivel n   ON n.id_nivel = p.nivel
+        LEFT JOIN isla i    ON i.id_isla = n.isla
+        WHERE j.cuenta=?
+        GROUP BY j.id_jugador, j.primer_nombre, j.tutorial_completado;
+    `;
+
+    const [rows] = await connection.execute(sqlQuery, [id_cuenta]);
+
+    const result = rows.map(row => {
+        const tutorial = Boolean(row.tutorial_completado);
+
+        let islas;
+
+        if (!tutorial) {
+            islas = {
+                isla_suma: false,
+                isla_resta: false,
+                isla_multiplicacion: false,
+                isla_division: false,
+                isla_todos: false
+            };
+        } else {
+            islas = {
+                isla_suma: true,
+                isla_resta: Boolean(row.supero_isla_suma),
+                isla_multiplicacion: Boolean(row.supero_isla_resta),
+                isla_division: Boolean(row.supero_isla_multiplicacion),
+                isla_todos: Boolean(row.supero_isla_division)
+            };
         }
-    })); 
-    
-    return a;
+
+        return {
+            estudiante: row.estudiante,
+            islas
+        };
+    });
+
+    return result;
 }
 
-// Función para guardar progreso
-async function saveProgreso(connection, { id_jugador, id_nivel, id_partida }) {
-  const [result] = await connection.execute(
-    `INSERT INTO progreso (id_jugador, id_nivel, id_partida)
-     VALUES (?, ?, ?)`,
-    [id_jugador, id_nivel, id_partida]
-  );
-  return result;
-}
+
 
 async function getGeneralInfo(connection){
     const queryJugadoresActivos = 
@@ -1013,7 +1064,7 @@ async function setTutorialCompletado(connection, id_cuenta) {
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
-  register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, saveProgreso, getGeneralInfo,
+  register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, getGeneralInfo,
   getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta,
   getReportesAnaliticos, getPlayerSkins, getPlayerProgress, setTutorialCompletado
 };
