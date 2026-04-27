@@ -415,7 +415,7 @@ app.post('/save_progress', async (req, res) => {
 
     const [monedasRow] = await connection.execute(`SELECT monedas FROM jugador WHERE id_jugador = ?`, [playerId]);
 
-    const newMonedas = monedasRow[0].monedas + score_max / 10;
+    const newMonedas = monedasRow[0].monedas + (intentos.length * 5);
 
 
     const [resultUpdateRow] = await connection.execute(`UPDATE jugador SET monedas=?, score_global=? WHERE id_jugador=?`, [newMonedas, newScore, playerId]);

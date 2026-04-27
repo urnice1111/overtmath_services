@@ -932,6 +932,9 @@ async function getPlayerProgress(connection, id_jugador) {
         WHERE cuenta = ?;
     `;
 
+    const [idJugadorRow] = await connection.execute(`SELECT id_jugador FROM jugador WHERE cuenta = ?`, [id_jugador]);
+    const idJugador = idJugadorRow[0].id_jugador;
+
     const sqlIslasSuperadas = `
         SELECT
             i.nombre AS isla_id,
@@ -970,7 +973,7 @@ async function getPlayerProgress(connection, id_jugador) {
 
     const tutorial_completado = Boolean(jugadorRows[0].tutorial_completado);
 
-    const [islasRows] = await connection.execute(sqlIslasSuperadas, [id_jugador]);
+    const [islasRows] = await connection.execute(sqlIslasSuperadas, [idJugador]);
 
     const superadas = {
         isla_suma: false,
