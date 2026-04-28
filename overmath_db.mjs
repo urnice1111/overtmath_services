@@ -1064,10 +1064,38 @@ async function setTutorialCompletado(connection, id_cuenta) {
     };
 }
 
+
+async function getSkinsForStore(connection, id_jugador){
+    const sqlQuery = `SELECT
+                        p.nombre_asset,
+                        p.descripcion,
+                        CASE
+                            WHEN jp.id_personaje IS NOT NULL THEN TRUE
+                            ELSE FALSE
+                        END AS desbloqueado
+                    FROM personaje p
+                    LEFT JOIN jugador_personaje jp
+                        ON jp.id_personaje = p.id_personaje
+                    AND jp.id_jugador = ?
+                    ORDER BY p.id_personaje;`;
+    const [rows] = await connection.execute(sqlQuery, [id_jugador]);
+
+    let result = [];
+    for (let row of rows){
+        result.push({
+            nombre_asset: row.nombre_asset,
+            descripcion: row.descripcion,
+            desbloqueado: row.desbloqueado
+        });
+    }
+
+    return result;
+}
+
 export default {
   connect, register, getQuestions, getScoreboard, login, register_jugador, register_tutor,
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
   register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, getGeneralInfo,
   getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta,
-  getReportesAnaliticos, getPlayerSkins, getPlayerProgress, setTutorialCompletado
+  getReportesAnaliticos, getPlayerSkins, getPlayerProgress, setTutorialCompletado, getSkinsForStore
 };

@@ -272,6 +272,10 @@ app.post('/login', async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
@@ -609,6 +613,27 @@ if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
       `http://${ ipAddress }:${ port }`);
   });
 }
+
+app.get('/get_skins_for_store/:id_cuenta', async (req, res)=>{
+  const id_cuenta = req.params.id_cuenta;
+  let connection;
+  try{
+    connection = await db.connect();
+    const [rows] = await connection.execute(`SELECT id_jugador FROM jugador WHERE cuenta = ?`, [id_cuenta])
+    const id_jugador = rows[0].id_jugador;
+    const result = await db.getSkinsForStore(connection, id_jugador);
+
+    return res.json(result);
+  } catch (err){
+
+    return res.status(500).json(err);
+ 
+  } finally{
+    if (connection) await connection.release();
+  }
+  
+
+});
 
 
 
