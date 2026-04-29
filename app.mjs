@@ -607,12 +607,37 @@ app.get('/player_skins/:id_jugador', async (req, res)=>{
 });
 
 
-if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
-  app.listen(port, () => {
-    console.log(
-      `http://${ ipAddress }:${ port }`);
-  });
-}
+app.post('/buy_skin', async (req, res) => {
+  const {cuentaId, assetName} = req.body;
+
+  console.log(cuentaId);
+  console.log(assetName);
+
+  let connection;
+  try{
+    connection = await db.connect();
+    const result = await db.buySkin(connection, cuentaId, assetName);
+    return res.json(result);
+  } catch (err){
+    return res.status(500).json({message: err.sqlMessage});
+  } if (connection)
+    await connection.release();
+});
+
+app.post(`/save_current_skin`, async (req, res)=>{
+  const {assetName, cuentaId} = req.body;
+  let connection;
+  try{
+    connection = await db.connect();
+    const result  = connection.execute(`UPDATE jugador SET skin_actual= ? WHERE cuenta = ?`, [assetName, cuentaId]);
+    return res.json(result);
+  } catch (err){
+    return res.status(500).json(err);
+  } finally{
+    if (connection)
+      await connection.release();
+  }
+});
 
 app.get('/get_skins_for_store/:id_cuenta', async (req, res)=>{
   const id_cuenta = req.params.id_cuenta;
@@ -631,9 +656,16 @@ app.get('/get_skins_for_store/:id_cuenta', async (req, res)=>{
   } finally{
     if (connection) await connection.release();
   }
-  
 
 });
+
+
+if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
+  app.listen(port, () => {
+    console.log(
+      `http://${ ipAddress }:${ port }`);
+  });
+}
 
 
 
