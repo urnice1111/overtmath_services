@@ -1069,6 +1069,7 @@ async function getSkinsForStore(connection, id_jugador){
     const sqlQuery = `SELECT
                         p.nombre_asset,
                         p.descripcion,
+                        p.precio,
                         CASE
                             WHEN jp.id_personaje IS NOT NULL THEN TRUE
                             ELSE FALSE
@@ -1077,6 +1078,7 @@ async function getSkinsForStore(connection, id_jugador){
                     LEFT JOIN jugador_personaje jp
                         ON jp.id_personaje = p.id_personaje
                     AND jp.id_jugador = ?
+                    WHERE p.nombre_asset != "default_skin"
                     ORDER BY p.id_personaje;`;
     const [rows] = await connection.execute(sqlQuery, [id_jugador]);
 
@@ -1085,11 +1087,19 @@ async function getSkinsForStore(connection, id_jugador){
         result.push({
             nombre_asset: row.nombre_asset,
             descripcion: row.descripcion,
-            desbloqueado: row.desbloqueado
+            desbloqueado: row.desbloqueado,
+            precio: row.precio
         });
     }
 
     return result;
+}
+
+
+async function buySkin(connection, cuentaId, assetName){
+    const [result] = await connection.execute('CALL buySkin(?, ?)' , [assetName, cuentaId])
+    const okPacket = result[result.length - 1]; // return affected rows
+    return okPacket;
 }
 
 export default {
@@ -1097,5 +1107,5 @@ export default {
   crearSolicitudVinculacion, getSolicitudesVinculacion, resolverSolicitudVinculacion, loginTutorAdmin,
   register_admin, savePartida, saveIntentoPregunta, getIslasProgreso, getGeneralInfo,
   getTutorDashboard, getAlertStudents, getAllPlayers, getInactivePlayers, activarCuenta,
-  getReportesAnaliticos, getPlayerSkins, getPlayerProgress, setTutorialCompletado, getSkinsForStore
+  getReportesAnaliticos, getPlayerSkins, getPlayerProgress, setTutorialCompletado, getSkinsForStore, buySkin
 };
