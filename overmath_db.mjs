@@ -363,11 +363,11 @@ async function loginTutorAdmin(connection, email, password, deviceType, rol) {
 }
 
 // Función para guardar partida
-async function savePartida(connection, { id_jugador, score_max, tiempo_seg, nivelId }) {
+async function savePartida(connection, { id_jugador, score_max, tiempo_seg, nivelId, resultado }) {
   const [result] = await connection.execute(
-    `INSERT INTO partida (score_max, tiempo_seg, nivel, jugador)
+    `INSERT INTO partida (score_max, tiempo_seg, nivel, jugador, resultado)
      VALUES (?, ?, ?, ?)`,
-    [score_max, tiempo_seg, nivelId, id_jugador]
+    [score_max, tiempo_seg, nivelId, id_jugador, resultado]
   );
   return result;
 }

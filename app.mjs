@@ -10,9 +10,6 @@ const ipAddress = process.env.C9_HOSTNAME ?? 'localhost';
 app.use(cors())
 app.use(express.json());
 
-
-
-
 app.post('/register', async (req, res) => {
   const { email, password } = req.body;
   let connection;
@@ -46,12 +43,12 @@ app.post('/register', async (req, res) => {
 
   } finally {
     if (connection) {
-      await connection.release();
+      await connection.end();
     }
   }
 });
 
-//Vinvulación con tutor y el jugador
+// --- Solicitudes de vinculación tutor ↔ jugador ---
 
 app.post('/solicitud_vinculacion', async (req, res) => {
   const { id_cuenta, id_jugador, parentezco } = req.body
@@ -83,15 +80,10 @@ app.get('/solicitudes_vinculacion', async (req, res) => {
     connection = await db.connect()
     const result = await db.getSolicitudesVinculacion(connection)
     return res.json(result)
-  } catch (err) 
-  {
+  } catch (err) {
     console.error(err)
-    
-
     return res.status(500).json({ error: err.message })
-  } 
-  finally 
-  {
+  } finally {
     if (connection) connection.release()
   }
 })
@@ -119,7 +111,7 @@ app.put('/solicitud_vinculacion/:id/resolver', async (req, res) => {
   } finally {
     if (connection) connection.release()
   }
-});
+})
 
 app.get('/get_questions/:island/:difficulty', async (req, res) => {
     const { island, difficulty } = req.params;
@@ -136,7 +128,7 @@ app.get('/get_questions/:island/:difficulty', async (req, res) => {
         res.status(500).json({name, message});
     } finally {
       if (connection){
-        await connection.release();
+        await connection.end();
       }
     }
 });
@@ -157,37 +149,10 @@ app.get('/get_scoreboard', async (req, res) => {
       res.status(500).json({name, message});
   } finally {
     if (connection){
-      await connection.release();
+      await connection.end();
     }
   }
 });
-
-const handleTutorDashboard = async (req, res) => {
-  const idCuenta = Number(req.params.idCuenta)
-
-  if (!Number.isInteger(idCuenta) || idCuenta <= 0) {
-    return res.status(400).json({ error: 'idCuenta invalido.' })
-  }
-
-  let connection
-  try {
-    connection = await db.connect()
-    const result = await db.getTutorDashboard(connection, idCuenta)
-    return res.json({ result })
-  } catch (err) {
-    console.error(err)
-    return res.status(err.status || 500).json({ error: err.message })
-  } finally {
-    if (connection) {
-      if (typeof connection.release === 'function') connection.release()
-      else if (typeof connection.end === 'function') await connection.release()
-    }
-  }
-}
-
-app.get('/tutor_dashboard/:idCuenta', handleTutorDashboard)
-
-
 app.post('/register_admin', async (req, res) => {
   const { email, password, name, last_name } = req.body
 
@@ -272,35 +237,10 @@ app.post('/login', async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ error: 'Internal server error' });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
   }
 });
 
 
-app.get('/get_player_progress/:id_jugador', async (req, res) => {
-    let connection;
-
-    try {
-        connection = await db.connect();
-        const { id_jugador } = req.params;
-
-        const result = await db.getPlayerProgress(connection, id_jugador);
-
-        return res.json(result);
-    } catch (error) {
-        console.error(error);
-        return res.status(error.status || 500).json({
-            error: error.message || 'Error al obtener el progreso del jugador'
-        });
-    } finally {
-        if (connection) {
-            connection.release();
-        }
-    }
-});
 
 app.post('/register_jugador', async (req, res) => {
   const { email, username, password, name, last_name, date } = req.body;
@@ -331,21 +271,6 @@ app.post('/register_jugador', async (req, res) => {
   }
 });
 
-
-app.post(`/set_tutorial_completed`, async (req, res)=>{
-  const {id_user} = req.body;
-  let connection;
-  try {
-    connection = await db.connect();
-    const result = db.setTutorialCompletado(connection, id_user);
-    return res.json(result)
-  } catch (err){
-    return res.status(500).json(err)
-  } finally {
-    if (connection)
-      await connection.release();
-  }
-});
 
 app.post('/register_tutor', async (req, res) => {
   const { email, password, name, last_name, number } = req.body;
@@ -393,9 +318,9 @@ app.post('/register_tutor', async (req, res) => {
 // });
 
 app.post('/save_progress', async (req, res) => {
-  const { id_cuenta, score_max, tiempo_seg, nombreIsla, dificultad, intentos } = req.body;
+  const { jugador, score_max, tiempo_seg, fecha_hora, nivel, resultado, intentos } = req.body;
 
-  if (!id_cuenta || !intentos) {
+  if (!jugador || !nivel || !intentos) {
     return res.status(400).json({ error: "Faltan campos obligatorios (jugador, nivel, intentos)." });
   }
 
@@ -403,42 +328,25 @@ app.post('/save_progress', async (req, res) => {
   try {
     connection = await db.connect();
 
-    const [playerIdRow] = await connection.execute(`SELECT id_jugador FROM jugador WHERE cuenta=?`, [id_cuenta]);
+    // Validar que el jugador existe
+    const [jugadorRows] = await connection.execute(
+      'SELECT id_jugador FROM jugador WHERE id_jugador = ?',
+      [jugador]
+    );
 
-    if (playerIdRow.length === 0) {
-      return res.status(400).json({ error: `El jugador con cuenta ${id_cuenta} no existe.` });
+    if (jugadorRows.length === 0) {
+      return res.status(400).json({ error: `El jugador ${jugador} no existe.` });
     }
-
-    const playerId = playerIdRow[0].id_jugador;
-
-    // Get nivel_id
-
-    const [currentScoreRow] = await connection.execute(`SELECT score_global FROM jugador WHERE id_jugador = ?`, [playerId]);
-
-    const newScore =  currentScoreRow[0].score_global + score_max;
-
-    const [monedasRow] = await connection.execute(`SELECT monedas FROM jugador WHERE id_jugador = ?`, [playerId]);
-
-    const newMonedas = monedasRow[0].monedas + (intentos.length * 5);
-
-
-    const [resultUpdateRow] = await connection.execute(`UPDATE jugador SET monedas=?, score_global=? WHERE id_jugador=?`, [newMonedas, newScore, playerId]);
-    
-
-    const [nivelIdRow] = await connection.execute(`
-                        SELECT id_nivel 
-                        FROM nivel n JOIN isla i ON n.isla=i.id_isla 
-                        WHERE i.nombre=? AND n.dificultad=?;`, [nombreIsla, dificultad])
-
-    const nivelId = nivelIdRow[0].id_nivel;
 
 
     // Guardar partida (siempre crea una nueva fila con id_partida AUTO_INCREMENT)
     const partidaResult = await db.savePartida(connection, {
-      id_jugador: playerId, 
+      jugador,
       score_max,
       tiempo_seg,
-      nivelId
+      fecha_hora,
+      nivel,
+      resultado
     });
 
     const id_partida = partidaResult.insertId;
@@ -454,155 +362,18 @@ app.post('/save_progress', async (req, res) => {
       });
     }
 
+    await db.saveProgreso(connection, {
+      id_jugador: jugador,
+      id_nivel: nivel,
+      id_partida
+    });
+
     return res.status(201).json({ message: 'Progreso guardado correctamente', id_partida });
-
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: err.message });
   } finally {
     if (connection) connection.release();
-  }
-
-});
-
-app.get('/islas_progreso/:id_cuenta', async (req, res) => {
-
-  const {id_cuenta} = req.params;
-  let connection;
-  
-
-  try{
-    connection = await db.connect();
-    const result = await db.getIslasProgreso(connection, id_cuenta);
-
-
-    return res.json(result);
-  }catch(err){
-      const {name, message} = err;
-      res.status(500).json({name, message});
-  } finally {
-    if (connection){
-      await connection.release();
-    }
-  }
-});
-
-app.get('/general_info', async (req, res) => {
-  let connection;
-  let host = `https://${req.hostname}`;
-  try{
-    connection = await db.connect();
-    const result = await db.getGeneralInfo(connection);
-
-
-    return res.json(result);
-  } catch (err){
-    return res.status(500).json(err);
-  } finally{
-    if (connection){
-      await connection.release();
-    }
-  }
-});
-
-app.get('/jugadores_alerta', async (req, res) => {
-  let connection;
-  let host = `https://${req.hostname}`;
-  try{
-    connection = await db.connect();
-    const result = await db.getAlertStudents(connection);
-
-    return res.json(result);
-  } catch (err){
-    return res.status(500).json(err);
-
-  } finally{
-    if (connection){
-      await connection.release();
-    }
-  }
-});
-
-
-app.get('/all_players', async (req, res)=>{
-  let connection;
-  let host = `https://${req.hostname}`;
-
-  try{
-    connection = await db.connect();
-    const result = await db.getAllPlayers(connection);
-    return res.json(result)
-
-  } catch (err){
-    return res.status(500).json(err);
-  } finally{
-    if (connection)
-      await connection.release();
-  }
-});
-
-app.get('/cuentas_inactivas', async (req, res) => {
-  let connection;
-  let host = `https://${req.hostname}`;
-
-  try {
-    connection = await db.connect();
-    const result = await db.getInactivePlayers(connection);
-    return res.json(result);
-  } catch (err){
-    return res.status(500).json(err);
-  } finally{
-    if (connection)
-      await connection.release();
-  }
-});
-
-app.put('/activar_rechazar_cuenta', async (req, res)=>{
- const {id_cuenta, accion} = req.body;
- let connection;
- let host = `https://${req.hostname}`;
-
- try{
-  connection = await db.connect();
-  const result = await db.activarCuenta(connection, id_cuenta, accion);
-  return res.json(result)
- } catch(err){
-  return res.status(500).json(err);
- } finally{
-  if (connection)
-    await connection.release();
- }
-
-});
-
-app.get('/reportes_analiticos', async (req, res) => {
-  let connection;
-  try {
-    connection = await db.connect();
-    const result = await db.getReportesAnaliticos(connection);
-    return res.json(result);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: err.message });
-  } finally {
-    if (connection) connection.release();
-  }
-});
-
-
-app.get('/player_skins/:id_jugador', async (req, res)=>{
-  const {id_jugador} = req.params;
-
-  let connection;
-  try{
-    connection = await db.connect();
-    const result = await db.getPlayerSkins(connection, id_jugador);
-    return res.json(result);
-  } catch (err){
-    return res.status(500).json(err);
-  } finally {
-    if (connection)
-      connection.release();
   }
 });
 
@@ -613,27 +384,6 @@ if (process.env.AWS_LAMBDA_FUNCTION_NAME === undefined) {
       `http://${ ipAddress }:${ port }`);
   });
 }
-
-app.get('/get_skins_for_store/:id_cuenta', async (req, res)=>{
-  const id_cuenta = req.params.id_cuenta;
-  let connection;
-  try{
-    connection = await db.connect();
-    const [rows] = await connection.execute(`SELECT id_jugador FROM jugador WHERE cuenta = ?`, [id_cuenta])
-    const id_jugador = rows[0].id_jugador;
-    const result = await db.getSkinsForStore(connection, id_jugador);
-
-    return res.json(result);
-  } catch (err){
-
-    return res.status(500).json(err);
- 
-  } finally{
-    if (connection) await connection.release();
-  }
-  
-
-});
 
 
 
